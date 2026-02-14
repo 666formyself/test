@@ -343,8 +343,9 @@ function cleanDoubaoText(text: string | null, maxFullChars = 600) {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const p of paras) {
-        // drop lines that look like instructions or checks
+        // drop lines that look like instructions, checks, or chain-of-thought markers
         if (/^(现在|请|注意|检查|整理|输出要求|只输出|Only return|Do not|Don't|Please|Now|Note)[:，,\s]/i.test(p)) continue;
+        if (/(现在整理|现在输出|现在检查|按照要求|输出要求|思考过程|过程|步骤|原因|解释|说明|提示|字数|检查字数|整理一下|现在|我将)/i.test(p)) continue;
         const norm = p.replace(/\s+/g, ' ').trim();
         if (seen.has(norm)) continue;
         seen.add(norm);
