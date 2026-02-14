@@ -110,8 +110,11 @@ const TRANSLATIONS = {
             delete: '删除', confirmDel: '确定要删除这个纪念日吗？',
             cats: { love: '浪漫恋爱', birthday: '温馨生日', life: '平凡生活', goal: '理想目标' },
             valentineTitle: '情人节快乐 ❤️',
-            valentineWish: '愿你的生活被爱填满，每一个小日子都闪闪发光。',
-            valentineBtn: '收下爱意'
+            valentineWish: '万物皆有回响，而我所有的温柔都想留给你。愿你在这个浪漫的日子，被爱意包裹。',
+            newYearTitle: '跨年钟声响 🎆',
+            newYearWish: '愿新的一年，星辰大海，皆是奔赴。愿你万事顺遂，岁岁平安，所得皆所愿。',
+            acceptLoveBtn: '收下这份爱',
+            acceptWishBtn: '迎接新一年'
         },
         statLabels: {
             streak: '连续打卡', today: '今日达成', total: '累计总数',
@@ -176,8 +179,11 @@ const TRANSLATIONS = {
             delete: 'Delete', confirmDel: 'Delete this anniversary?',
             cats: { love: 'Romance', birthday: 'Birthday', life: 'Daily Life', goal: 'Milestone' },
             valentineTitle: 'Happy Valentine\'s ❤️',
-            valentineWish: 'May your life be filled with love, and every small day shine bright.',
-            valentineBtn: 'Accept Love'
+            valentineWish: 'In a world full of echoes, my heart only beats for you. May your day be filled with endless warmth.',
+            newYearTitle: 'Happy New Year 🎆',
+            newYearWish: 'May the new year bring you closer to the stars. Wishing you peace, joy and prosperity in every step.',
+            acceptLoveBtn: 'Accept Love',
+            acceptWishBtn: 'Welcome New Year'
         },
         statLabels: {
             streak: 'Streak', today: 'Today', total: 'Total',
@@ -269,6 +275,34 @@ const SplashScreen = ({ onFinish, t }: { onFinish: () => void, t: any }) => {
     );
 };
 
+const FestivalPopup = ({ type, t, onClose }: { type: 'valentine' | 'newyear', t: any, onClose: () => void }) => {
+    const [isClosing, setIsClosing] = useState(false);
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(onClose, 400);
+    };
+
+    return (
+        <div className={`festival-popup-overlay ${isClosing ? 'out' : ''}`} onClick={handleClose}>
+            <div className={`festival-card ${type}`} onClick={e => e.stopPropagation()}>
+                <div className="floating-icons">
+                    {type === 'valentine' ? 
+                        ['❤️','💖','✨','🌹','💕','🍯','🦋'].map((it, idx) => <span key={idx} className={`float i-${idx}`}>{it}</span>) :
+                        ['🎇','🧨','✨','💰','🧧','🏮','🥂'].map((it, idx) => <span key={idx} className={`float i-${idx}`}>{it}</span>)
+                    }
+                </div>
+                <div className="festival-icon-hero">{type === 'valentine' ? '💑' : '🎆'}</div>
+                <h2 className="festival-title">{type === 'valentine' ? t.anniv.valentineTitle : t.anniv.newYearTitle}</h2>
+                <div className="festival-divider"></div>
+                <p className="festival-wish">{type === 'valentine' ? t.anniv.valentineWish : t.anniv.newYearWish}</p>
+                <button className="festival-btn" onClick={handleClose}>
+                    {type === 'valentine' ? t.anniv.acceptLoveBtn : t.anniv.acceptWishBtn}
+                </button>
+            </div>
+        </div>
+    );
+};
+
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'anniversary'>('home');
@@ -277,6 +311,7 @@ function App() {
     const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [activeFestival, setActiveFestival] = useState<'valentine' | 'newyear' | null>(null);
     
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh',
@@ -319,6 +354,16 @@ function App() {
         if (hour >= 18 && hour < 22) return t.greetings.evening;
         return t.greetings.night;
     };
+
+    useEffect(() => {
+        const now = new Date();
+        const m = now.getMonth() + 1;
+        const d = now.getDate();
+        // 情人节 2.14
+        if (m === 2 && d === 14) setActiveFestival('valentine');
+        // 元旦 1.1
+        else if (m === 1 && d === 1) setActiveFestival('newyear');
+    }, []);
 
     useEffect(() => {
         const checkReminders = () => {
@@ -522,6 +567,7 @@ function App() {
     return (
         <>
             {isAppLoading && <SplashScreen t={t} onFinish={() => setIsAppLoading(false)} />}
+            {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
             <div className={`app-container ${isAppLoading ? 'hidden' : 'fade-in-ready'}`}>
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
@@ -654,24 +700,70 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
     const [newDate, setNewDate] = useState('');
-    const handleAdd = () => { if (!newName || !newDate) return; const item: Anniversary = { id: Math.random().toString(36).substr(2, 9), name: newName, date: newDate, category: 'life' }; setAnniversaries([...anniversaries, item]); setNewName(''); setNewDate(''); setShowAdd(false); };
+    const [newCat, setNewCat] = useState<'love' | 'birthday' | 'life' | 'goal'>('life');
+
+    const handleAdd = () => {
+        if (!newName || !newDate) return;
+        const item: Anniversary = { id: Math.random().toString(36).substr(2, 9), name: newName, date: newDate, category: newCat };
+        setAnniversaries([...anniversaries, item]);
+        setNewName(''); setNewDate(''); setNewCat('life');
+        setShowAdd(false);
+    };
+
+    const getDaysBetween = (target: string) => {
+        const d1 = new Date(target).getTime();
+        const d2 = new Date().setHours(0,0,0,0);
+        const diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+        return diff;
+    };
+
+    const catIcons = { love: '❤️', birthday: '🎂', life: '🌱', goal: '🎯' };
+    const catColors = { love: '#FFD7E2', birthday: '#FFF4D6', life: '#E5F6D3', goal: '#D6E9FF' };
+
     return (
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.anniv.title}</h2></div>
             <div className="anniv-stats" style={{display:'flex', justifyContent:'space-between', padding:'0 8px 24px'}}><span style={{fontSize:'13px', fontWeight:'700', color:'var(--text-soft)'}}>已收录 {anniversaries.length} 个瞬间</span><button onClick={() => setShowAdd(true)} style={{fontSize:'13px', fontWeight:'850', color:'var(--accent)'}}>+ {t.anniv.add}</button></div>
             <div className="anniv-list" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                {anniversaries.map((a: Anniversary) => (
-                    <div key={a.id} className="anniv-card" style={{background:'white', borderRadius:'32px', padding:'24px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:'var(--shadow-soft)'}}>
-                        <div><p style={{margin:0, fontWeight:'850', fontSize:'16px'}}>{a.name}</p><p style={{margin:'4px 0 0', fontSize:'12px', color:'var(--text-soft)'}}>{a.date}</p></div>
-                        <button onClick={() => {if(confirm(t.anniv.confirmDel)) setAnniversaries(anniversaries.filter((it:any)=>it.id !== a.id))}} style={{color:'#FF3B30', fontSize:'12px'}}>{t.anniv.delete}</button>
-                    </div>
-                ))}
+                {anniversaries.length === 0 ? 
+                    <div className="empty-state" style={{marginTop:'40px'}}><p>{t.anniv.empty}</p></div> :
+                    anniversaries.map((a: Anniversary) => {
+                        const days = getDaysBetween(a.date);
+                        return (
+                            <div key={a.id} className="anniv-card-full" style={{background:'var(--card-bg)', borderRadius:'32px', padding:'24px', display:'flex', alignItems:'center', justifyContent:'space-between', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-soft)'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+                                    <div style={{width:'48px', height:'48px', borderRadius:'16px', background: catColors[a.category], display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px'}}>{catIcons[a.category]}</div>
+                                    <div><p style={{margin:0, fontWeight:'850', fontSize:'16px'}}>{a.name}</p><p style={{margin:'4px 0 0', fontSize:'12px', color:'var(--text-soft)', fontWeight:'600'}}>{a.date}</p></div>
+                                </div>
+                                <div style={{textAlign:'right'}}>
+                                    <p style={{margin:0, fontSize:'11px', color:'var(--text-soft)', fontWeight:'800'}}>{days >= 0 ? t.anniv.past : t.anniv.future}</p>
+                                    <p style={{margin:0, fontSize:'24px', fontWeight:'900', color: days >= 0 ? 'var(--accent)' : 'var(--blue)'}}>{Math.abs(days)}<span style={{fontSize:'12px', marginLeft:'2px'}}>{t.anniv.day}</span></p>
+                                    <button onClick={() => {if(confirm(t.anniv.confirmDel)) setAnniversaries(anniversaries.filter((it:any)=>it.id !== a.id))}} style={{color:'#FF3B30', fontSize:'10px', marginTop:'8px', fontWeight:'700'}}>{t.anniv.delete}</button>
+                                </div>
+                            </div>
+                        );
+                    })
+                }
             </div>
             {showAdd && (
                 <div className="drawer-overlay" onClick={() => setShowAdd(false)} style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.1)', zIndex:2000, display:'flex', alignItems:'flex-end'}}>
                     <div className="drawer-content" onClick={e => e.stopPropagation()} style={{width:'100%', background:'white', borderTopLeftRadius:'40px', borderTopRightRadius:'40px', padding:'40px 24px'}}>
-                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder={t.anniv.name} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', marginBottom:'16px'}} />
-                        <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', marginBottom:'16px'}} />
+                        <h3 style={{margin:'0 0 24px', fontSize:'18px', fontWeight:'850'}}>{t.anniv.add}</h3>
+                        
+                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'24px'}}>
+                            {Object.entries(t.anniv.cats).map(([key, label]: any) => (
+                                <button key={key} onClick={() => setNewCat(key)} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', border:'none', background:'none'}}>
+                                    <div style={{width:'56px', height:'56px', borderRadius:'18px', background: newCat === key ? catColors[key as keyof typeof catColors] : '#F4F4F7', border: newCat === key ? '2px solid var(--accent)' : '2px solid transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'24px', transition:'0.2s'}}>
+                                        {catIcons[key as keyof typeof catIcons]}
+                                    </div>
+                                    <span style={{fontSize:'11px', fontWeight:'800', color: newCat === key ? 'var(--text-main)' : 'var(--text-soft)'}}>{label}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder={t.anniv.name} className="time-input-simple" style={{marginBottom:'16px'}} />
+                        <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="time-input-simple" style={{marginBottom:'24px'}} />
+                        
                         <button onClick={handleAdd} className="btn-confirm highlight" style={{width:'100%'}}>{t.complete} ✨</button>
                     </div>
                 </div>
