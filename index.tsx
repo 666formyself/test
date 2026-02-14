@@ -274,7 +274,6 @@ async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, pro
     const json = await resp.json();
     return json.result;
 }
-}
 
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
