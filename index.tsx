@@ -691,45 +691,116 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
     return (
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.settings}</h2></div>
-            <section className="settings-section">
-                <h4 className="category-title">{t.general}</h4>
-                <div className="settings-card">
-                    <div className="setting-item">
-                        <span>{t.language}</span>
-                        <div className="segment-control">
-                            <button className={settings.language === 'zh' ? 'active' : ''} onClick={() => update({ language: 'zh' })}>ZH</button>
-                            <button className={settings.language === 'en' ? 'active' : ''} onClick={() => update({ language: 'en' })}>EN</button>
+
+            <div className="settings-container">
+                <div className="settings-card-new">
+                    <div className="setting-row">
+                        <div className="setting-left">
+                            <div className="icon-circle">🌐</div>
+                            <div>
+                                <div className="setting-title">{t.language}</div>
+                                <div className="setting-desc">{settings.language === 'zh' ? t.langOptions.zh : t.langOptions.en}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <div className="pill-group">
+                                <button className={settings.language === 'zh' ? 'pill active' : 'pill'} onClick={() => update({ language: 'zh' })}>{t.langOptions.zh}</button>
+                                <button className={settings.language === 'en' ? 'pill active' : 'pill'} onClick={() => update({ language: 'en' })}>{t.langOptions.en}</button>
+                            </div>
                         </div>
                     </div>
-                    <div className="setting-item">
-                        <span>{t.darkMode} ({t.followSystem})</span>
-                        <label className="cream-switch">
-                            <input type="checkbox" checked={settings.darkModeType === 'system'} onChange={e => update({ darkModeType: e.target.checked ? 'system' : 'manual' })} />
-                            <span className="slider"></span>
-                        </label>
+
+                    <div className="divider" />
+
+                    <div className="setting-row">
+                        <div className="setting-left">
+                            <div className="icon-circle">🌓</div>
+                            <div>
+                                <div className="setting-title">{t.darkMode}</div>
+                                <div className="setting-desc">{t.followSystem} / {t.manualControl}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <label className="switch">
+                                <input type="checkbox" checked={settings.darkModeType === 'system'} onChange={e => update({ darkModeType: e.target.checked ? 'system' : 'manual' })} />
+                                <span className="slider-round"></span>
+                            </label>
+                        </div>
                     </div>
-                    <button className="setting-item-btn" onClick={handleInstall} style={{ borderBottom: 'none' }}><span>{t.addToHome}</span><span style={{ fontSize: '18px', color: 'var(--accent)' }}>📲</span></button>
-                </div>
-            </section>
-            <section className="settings-section">
-                <h4 className="category-title">{t.reminder.title}</h4>
-                <div className="settings-card">
-                    <div className="setting-item">
-                        <div style={{display:'flex', flexDirection:'column'}}><span>{t.reminder.checkIn}</span><small style={{fontSize:'10px', color: (typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>{(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}</small></div>
-                        <label className="cream-switch"><input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} /><span className="slider"></span></label>
+
+                    <div className="divider" />
+
+                    <div className="setting-row" style={{ paddingBottom: 6 }}>
+                        <div className="setting-left">
+                            <div className="icon-circle">📲</div>
+                            <div>
+                                <div className="setting-title">{t.addToHome}</div>
+                                <div className="setting-desc">{t.addToHomeGuideDefault}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <button className="setting-action-btn" onClick={handleInstall}> {t.addToHome} </button>
+                        </div>
                     </div>
-                    <div className="setting-item"><span>{t.reminder.fixedReminder}</span><label className="cream-switch"><input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => updateReminders({ fixedReminderEnabled: e.target.checked })} /><span className="slider"></span></label></div>
-                    {settings.reminders.fixedReminderEnabled && <div className="setting-item"><span>{t.reminder.fixedTime}</span><input type="time" className="time-input-simple" style={{maxWidth:'100px'}} value={settings.reminders.fixedReminderTime} onChange={e => updateReminders({ fixedReminderTime: e.target.value })} /></div>}
                 </div>
-            </section>
-            <section className="settings-section">
-                <h4 className="category-title">{t.storage}</h4>
-                <div className="settings-card">
-                    <button className="setting-action-btn danger" onClick={() => { if (confirm(t.confirmClear)) { setRecords([]); localStorage.removeItem('jq_records'); } }}>{t.clearCache}</button>
+
+                <div className="settings-card-new">
+                    <div className="section-label">{t.reminder.title}</div>
+                    <div className="setting-row">
+                        <div className="setting-left">
+                            <div className="icon-circle">⏰</div>
+                            <div>
+                                <div className="setting-title">{t.reminder.checkIn}</div>
+                                <div className="setting-desc">{(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <label className="switch"><input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} /><span className="slider-round"></span></label>
+                        </div>
+                    </div>
+
+                    <div className="divider" />
+
+                    <div className="setting-row">
+                        <div className="setting-left">
+                            <div className="icon-circle">📅</div>
+                            <div>
+                                <div className="setting-title">{t.reminder.fixedReminder}</div>
+                                <div className="setting-desc">{t.reminder.fixedTime}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <label className="switch"><input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => updateReminders({ fixedReminderEnabled: e.target.checked })} /><span className="slider-round"></span></label>
+                        </div>
+                    </div>
+
+                    {settings.reminders.fixedReminderEnabled && (
+                        <div className="setting-row" style={{ paddingTop: 6 }}>
+                            <div className="setting-left" style={{ gap: 8 }}></div>
+                            <div className="setting-right"><input type="time" className="time-input-simple" value={settings.reminders.fixedReminderTime} onChange={e => updateReminders({ fixedReminderTime: e.target.value })} /></div>
+                        </div>
+                    )}
                 </div>
-            </section>
+
+                <div className="settings-card-new">
+                    <div className="section-label">{t.storage}</div>
+                    <div className="setting-row">
+                        <div className="setting-left">
+                            <div className="icon-circle">🗄️</div>
+                            <div>
+                                <div className="setting-title">{t.storage}</div>
+                                <div className="setting-desc">{t.storageUsage}: {records.length}</div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <button className="setting-action-btn danger" onClick={() => { if (confirm(t.confirmClear)) { setRecords([]); localStorage.removeItem('jq_records'); } }}>{t.clearCache}</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
             {guideType && (
-                /* Fix CSS blur() call in backdropFilter by changing it to a string literal 'blur(8px)' to avoid conflict with window.blur(). */
                 <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent:'center', padding: '24px' }}>
                     <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', background: 'white' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>{guideType === 'ios' ? '📱' : '🧭'}</div>
