@@ -256,6 +256,11 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
 
 // Doubao API config (read from injected env)
 const DOUBAO_API_KEY = (typeof process !== 'undefined' && (process.env as any).DOUBAO_API_KEY) || '';
+// Safety: log presence (not value) to help debug build-time injection on deployment
+try {
+    // eslint-disable-next-line no-console
+    console.log('DOUBAO_API_KEY present?', !!DOUBAO_API_KEY, 'type:', typeof DOUBAO_API_KEY);
+} catch (e) { }
 
 async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, prompt: string) {
     try {
@@ -662,6 +667,11 @@ function App() {
             {isAppLoading && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
             {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
             <div className={`app-container ${appReady ? 'fade-in-ready' : ''}`}>
+                {!DOUBAO_API_KEY && (
+                    <div className="api-key-warning">
+                        {settings.language === 'zh' ? 'API 密钥未配置：请在项目根目录创建 .env.local 并设置 DOUBAO_API_KEY，然后重新部署。' : 'API key not configured: create a .env.local at project root, set DOUBAO_API_KEY and redeploy.'}
+                    </div>
+                )}
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
                 )}

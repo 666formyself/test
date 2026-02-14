@@ -29,3 +29,10 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 Do NOT commit `.env.local` with real secret keys to source control.
+
+Vercel specific notes
+---------------------
+- Vite replaces environment values at build time. On Vercel you must set `DOUBAO_API_KEY` in Project → Settings → Environment Variables and make sure it's available for the build (select the correct Environment: `Production` or `Preview`).
+- After changing environment variables in Vercel, trigger a redeploy (Deployments → Redeploy) so the new value is injected into the built frontend.
+- To verify without exposing the key, open the site in a browser and check DevTools Console — the app logs `DOUBAO_API_KEY present? true` when the key is injected at build time.
+- Security: do NOT put long-lived secrets into client-side bundles. For production, prefer a serverless proxy (an API route on Vercel) that holds the secret and forwards requests to Doubao.

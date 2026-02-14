@@ -68,6 +68,23 @@ body {
 }
 
 .app-container.fade-in-ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* API key warning banner */
+.api-key-warning {
+    width: calc(100% - 32px);
+    max-width: 460px;
+    margin: 12px auto;
+    padding: 10px 14px;
+    background: linear-gradient(90deg, rgba(255,240,240,0.98), rgba(255,230,230,0.98));
+    border: 1px solid rgba(255,80,80,0.12);
+    color: #8B0000;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 13px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(255,80,80,0.06);
+    z-index: 3000;
+}
 .app-container.hidden { display: none; }
 
 /* 现代感主页头部 */
