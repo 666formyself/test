@@ -388,6 +388,40 @@ function cleanDoubaoText(text: string | null, maxFullChars = 600) {
     return result;
 }
 
+// 强制将清理后的文本格式化为：第一行为一句话结论，随后最多 3 条要点。
+function formatFinalResult(text: string | null, maxFullChars = 600) {
+    if (!text) return '';
+    const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return '';
+
+    // 第一非空行作为结论，去掉常见前导编号或序号
+    let conclusion = lines[0].replace(/^[\s\d。.、\)\(①②③一二三四五六七八九十]+/, '').trim();
+
+    const bullets: string[] = [];
+    // 优先收集显式的要点行（以 -、数字序号等开头）
+    for (let i = 1; i < lines.length && bullets.length < 3; i++) {
+        const l = lines[i];
+        if (/^[-–—•·\*]\s*/.test(l) || /^[\d一二三四五六七八九十]+[)\.、]\s*/.test(l)) {
+            bullets.push(l.replace(/^[-–—•·\*\s\d一二三四五六七八九十\)\.、]+/, '').trim());
+        }
+    }
+
+    // 如果没有显式要点，则从剩余文本中按句子拆取最多 3 条
+    if (bullets.length === 0) {
+        const rest = lines.slice(1).join(' ');
+        const sents = rest.split(/[。.!?；;]+/).map(s => s.trim()).filter(Boolean);
+        for (const s of sents) {
+            if (bullets.length >= 3) break;
+            bullets.push(s);
+        }
+    }
+
+    let out = conclusion;
+    if (bullets.length) out += '\n' + bullets.slice(0, 3).map(b => '- ' + b).join('\n');
+    if (out.length > maxFullChars) out = out.slice(0, maxFullChars) + '…';
+    return out;
+}
+
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
     useEffect(() => {
@@ -659,6 +693,8 @@ function App() {
                 const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
                 let textOutput = parseDoubaoResult(response) || '';
                 textOutput = cleanDoubaoText(textOutput, 600);
+                // 最终强制格式化，保证只包含结论与最多三条要点，去除思路与多余说明
+                textOutput = formatFinalResult(textOutput, 600);
                 setCalorieResult(textOutput);
             } catch (err: any) {
                 const msg = err?.message || String(err);
