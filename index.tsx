@@ -73,6 +73,13 @@ const TRANSLATIONS = {
         distance: '运动距离', km: '公里', m: '米',
         count: '个数', sets: '组数', times: '次', groups: '组',
         wakeTime: '起床时间', min: '分钟',
+        reminder: {
+            title: '提醒设置', checkIn: '打卡提醒', auxiliary: '辅助提醒', count: '提醒次数',
+            interval: '提醒间隔', dnd: '免打扰时段', anim: '动画强度',
+            authNeeded: '请授权通知权限，以使用提醒功能', goAuth: '去授权',
+            report: '统计报告', share: '分享成功', message: '消息中心',
+            intensity: { strong: '强', medium: '中', weak: '弱', off: '关闭' }
+        },
         anniv: {
             title: '小岁月的记录', add: '记下一刻', name: '在这个日子...', date: '选择日期',
             past: '已度过', future: '还有', day: '天', empty: '生活需要仪式感，记下一件事吧~',
@@ -110,6 +117,13 @@ const TRANSLATIONS = {
         distance: 'Distance', km: 'km', m: 'm',
         count: 'Count', sets: 'Sets', times: 'times', groups: 'sets',
         wakeTime: 'Wake-up Time', min: 'min',
+        reminder: {
+            title: 'Reminders', checkIn: 'Check-in Alert', auxiliary: 'Auxiliary Alert', count: 'Alert Count',
+            interval: 'Interval', dnd: 'DND Period', anim: 'Animation',
+            authNeeded: 'Please grant notification permission', goAuth: 'Grant',
+            report: 'Report Notify', share: 'Share Notify', message: 'Message Center',
+            intensity: { strong: 'High', medium: 'Med', weak: 'Weak', off: 'Off' }
+        },
         anniv: {
             title: 'Memory Lane', add: 'Record Moment', name: 'On this day...', date: 'Pick Date',
             past: 'Passed', future: 'Remaining', day: 'Days', empty: 'Life needs ceremony, record something~',
@@ -365,6 +379,7 @@ function App() {
                 {view === 'food' && (<div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>AI {t.calories}</h2></div><div className="detail-card" style={{textAlign:'center', background:'var(--card-bg)', padding:'40px', borderRadius:'32px', border:'1px solid var(--border-color)'}}>{isAnalyzing ? <div className="refresh-anim">Analyzing...</div> : calorieResult ? <div className="refresh-anim" style={{textAlign:'left', whiteSpace:'pre-wrap'}}>{calorieResult}</div> : (<label style={{cursor:'pointer'}}><input type="file" hidden onChange={handleImageUpload} /><div style={{fontSize:'64px', marginBottom:'20px'}}>📸</div><h3>{t.scanFood}</h3></label>)}</div></div>)}
                 {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                 {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
+                {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} />}
             </main>
             <nav className="bottom-nav">
                 <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
@@ -372,6 +387,112 @@ function App() {
                 <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}><FoodIcon active={view === 'food'} /><span>{t.calories}</span></button>
                 <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></button>
             </nav>
+        </div>
+    );
+}
+
+function SettingsView({ t, settings, setSettings, setView, records, setRecords }: any) {
+    const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
+    const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
+
+    return (
+        <div className="view">
+            <div className="sub-header">
+                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
+                <h2>{t.settings}</h2>
+            </div>
+
+            <section className="settings-section">
+                <h4 className="category-title">{t.general}</h4>
+                <div className="settings-card">
+                    <div className="setting-item">
+                        <span>{t.language}</span>
+                        <div className="segment-control">
+                            <button className={settings.language === 'zh' ? 'active' : ''} onClick={() => update({ language: 'zh' })}>ZH</button>
+                            <button className={settings.language === 'en' ? 'active' : ''} onClick={() => update({ language: 'en' })}>EN</button>
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <span>{t.darkMode} ({t.followSystem})</span>
+                        <label className="cream-switch">
+                            <input type="checkbox" checked={settings.darkModeType === 'system'} onChange={e => update({ darkModeType: e.target.checked ? 'system' : 'manual' })} />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
+                    {settings.darkModeType === 'manual' && (
+                        <div className="setting-item">
+                            <span>{t.manualControl}</span>
+                            <label className="cream-switch">
+                                <input type="checkbox" checked={settings.manualDarkMode} onChange={e => update({ manualDarkMode: e.target.checked })} />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            <section className="settings-section">
+                <h4 className="category-title">{t.reminder.title}</h4>
+                <div className="settings-card">
+                    <div className="setting-item">
+                        <span>{t.reminder.checkIn}</span>
+                        <label className="cream-switch">
+                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
+                    <div className="setting-item">
+                        <span>{t.reminder.count}</span>
+                        <div className="segment-control small">
+                            {[1, 2, 3].map(v => (
+                                <button key={v} className={settings.reminders.reminderCount === v ? 'active' : ''} onClick={() => updateReminders({ reminderCount: v })}>{v}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <span>{t.reminder.interval} (min)</span>
+                        <div className="segment-control small">
+                            {[5, 10, 30].map(v => (
+                                <button key={v} className={settings.reminders.interval === v ? 'active' : ''} onClick={() => updateReminders({ interval: v })}>{v}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="setting-item vertical">
+                        <span>{t.reminder.dnd}</span>
+                        <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '8px' }}>
+                            <input type="time" className="time-input-simple" value={settings.reminders.dndStart} onChange={e => updateReminders({ dndStart: e.target.value })} />
+                            <span style={{ alignSelf: 'center', opacity: 0.3 }}>-</span>
+                            <input type="time" className="time-input-simple" value={settings.reminders.dndEnd} onChange={e => updateReminders({ dndEnd: e.target.value })} />
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <span>{t.reminder.anim}</span>
+                        <div className="segment-control">
+                            {(['strong', 'medium', 'weak', 'off'] as AnimIntensity[]).map(v => (
+                                <button key={v} className={settings.reminders.animIntensity === v ? 'active' : ''} onClick={() => updateReminders({ animIntensity: v })}>{t.reminder.intensity[v]}</button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="settings-section">
+                <h4 className="category-title">{t.storage}</h4>
+                <div className="settings-card">
+                    <div className="setting-item">
+                        <span>{t.storageUsage}</span>
+                        <span style={{ fontWeight: '800', color: 'var(--text-soft)' }}>{records.length} {t.statLabels.items}</span>
+                    </div>
+                    <button className="setting-action-btn danger" onClick={() => {
+                        if (confirm(t.confirmClear)) {
+                            setRecords([]);
+                            localStorage.removeItem('jq_records');
+                        }
+                    }}>
+                        {t.clearCache}
+                    </button>
+                </div>
+            </section>
         </div>
     );
 }
@@ -463,7 +584,6 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
                 </div>
             )}
 
-            {/* 情人节弹窗 */}
             {showValentine && (
                 <div className="valentine-overlay" style={{position:'fixed', inset:0, zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px', background:'rgba(255, 251, 248, 0.85)', backdropFilter:'blur(20px)', animation:'fadeIn 0.5s ease'}}>
                     <div className="valentine-card" style={{background:'white', width:'100%', maxWidth:'320px', borderRadius:'48px', padding:'48px 24px', textAlign:'center', boxShadow:'0 20px 60px rgba(255, 107, 107, 0.15)', animation:'slideInUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'}}>
