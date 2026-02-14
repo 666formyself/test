@@ -78,7 +78,7 @@ const TRANSLATIONS = {
         nextTime: '稍后再说', customTask: '自定义任务',
         distance: '运动距离', km: '公里', m: '米',
         count: '个数', sets: '组数', times: '次', groups: '组',
-        wakeTime: '起床时间', min: '分钟',
+        wakeTime: '起床时刻', min: '分钟',
         greetings: {
             earlyMorning: '清晨好，迎接第一缕阳光',
             morning: '上午好，开启充满活力的一天',
@@ -120,7 +120,7 @@ const TRANSLATIONS = {
         },
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
-            habits: '自律习惯', mind: '精神寄托', housework: '工作'
+            habits: '自律习惯', mind: '精神寄托', housework: '日常事务'
         }
     },
     en: {
@@ -194,7 +194,7 @@ const TRANSLATIONS = {
 // --- 安全 API 调用工具函数 ---
 const safeVibrate = (pattern: number[]) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(pattern); } catch (e) { /* silent fail on unsupported devices */ }
+        try { navigator.vibrate(pattern); } catch (e) { /* silent fail */ }
     }
 };
 
@@ -202,23 +202,29 @@ const triggerNotification = (title: string, body: string) => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
             new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' });
-        } catch (e) {
-            // 在某些 PWA 环境下可能报错，可在此添加备用 ServiceWorker 逻辑
-        }
+        } catch (e) { }
     }
 };
 
 const HomeIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "#FF9671" : "none"} stroke={active ? "#FF9671" : "#A1A1AA"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
+        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
 );
 const CheckIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "#FF9671" : "none"} stroke={active ? "#FF9671" : "#A1A1AA"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
+        <polyline points="20 6 9 17 4 12"/>
+    </svg>
 );
 const FoodIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "#FF9671" : "none"} stroke={active ? "#FF9671" : "#A1A1AA"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 1 7 7c0 2.5-2 4.5-4.5 4.5S10 11.5 10 9s2-7 2-7Z"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
+        <path d="M12 20.94c1.88-1.55 3.94-3.08 5.61-4.78a9 9 0 1 0-11.22 0c1.67 1.7 3.73 3.23 5.61 4.78z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
 );
 const StatsIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "#FF9671" : "none"} stroke={active ? "#FF9671" : "#A1A1AA"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
 );
 
 const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
@@ -227,23 +233,44 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
         const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+    return (
+        <div className="clock-section" style={{ textAlign: 'center', margin: '24px 0' }}>
+            <h1 style={{ fontSize: '52px', margin: 0, fontWeight: '900', color: 'var(--text-main)' }}>
+                {time.getHours().toString().padStart(2, '0')}:{time.getMinutes().toString().padStart(2, '0')}
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-soft)', fontWeight: '700', margin: '4px 0 0' }}>
+                {time.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+        </div>
+    );
+};
 
-    const dateStr = time.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
-        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
-    });
-    const timeStr = time.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', {
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    });
+const SplashScreen = ({ onFinish, t }: { onFinish: () => void, t: any }) => {
+    const [fadeOut, setFadeOut] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setFadeOut(true);
+            setTimeout(onFinish, 600);
+        }, 2200);
+        return () => clearTimeout(timer);
+    }, [onFinish]);
 
     return (
-        <div className="clock-widget" style={{padding:'24px', background:'white', borderRadius:'32px', textAlign:'center', boxShadow:'0 10px 30px rgba(0,0,0,0.03)', marginBottom:'32px'}}>
-            <div className="clock-time" style={{fontSize:'48px', fontWeight:'900', color:'var(--accent)', letterSpacing:'-1px'}}>{timeStr}</div>
-            <div className="clock-date" style={{fontSize:'14px', fontWeight:'700', color:'var(--text-soft)', marginTop:'4px'}}>{dateStr}</div>
+        <div className={`splash-overlay ${fadeOut ? 'fade-up' : ''}`}>
+            <div className="splash-content">
+                <div className="splash-logo">🥑</div>
+                <h1 className="splash-title">佳倩管家</h1>
+                <p className="splash-subtitle">{t.warmMoments}</p>
+                <div className="splash-loader-track">
+                    <div className="splash-loader-bar"></div>
+                </div>
+            </div>
         </div>
     );
 };
 
 function App() {
+    const [isAppLoading, setIsAppLoading] = useState(true);
     const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'anniversary'>('home');
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
     const [records, setRecords] = useState<CheckInRecord[]>([]);
@@ -293,11 +320,9 @@ function App() {
         return t.greetings.night;
     };
 
-    // --- 通知引擎 ---
     useEffect(() => {
         const checkReminders = () => {
             if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-
             const now = new Date();
             const hour = now.getHours();
             const min = now.getMinutes();
@@ -312,23 +337,20 @@ function App() {
                 }
             }
 
-            if (settings.reminders.checkInEnabled) {
+            if (settings.reminders.checkInEnabled && min === 0) {
                 const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
                     ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
                     : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
                 
                 if (isDND) return;
-
                 const todayTimestamp = new Date().setHours(0,0,0,0);
                 const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === todayTimestamp);
-
-                if (!hasTodayCheckin && min === 0) {
+                if (!hasTodayCheckin) {
                     triggerNotification(t.notif.title, t.notif.body);
                     if (settings.vibration) safeVibrate([200, 100, 200]);
                 }
             }
         };
-
         const interval = setInterval(checkReminders, 60000);
         return () => clearInterval(interval);
     }, [settings.reminders, records, t, settings.vibration]);
@@ -364,16 +386,12 @@ function App() {
             document.body.className = isDark ? 'dark' : '';
         };
         applyTheme();
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const listener = () => { if (settings.darkModeType === 'system') applyTheme(); };
-        mediaQuery.addEventListener('change', listener);
         if (!firstUpdate.current) {
             localStorage.setItem('jq_records', JSON.stringify(records));
             localStorage.setItem('jq_settings', JSON.stringify(settings));
             localStorage.setItem('jq_anniv', JSON.stringify(anniversaries));
         }
         firstUpdate.current = false;
-        return () => mediaQuery.removeEventListener('change', listener);
     }, [records, settings, anniversaries]);
 
     const statsData = useMemo(() => {
@@ -476,18 +494,18 @@ function App() {
                             <div className="empty-state"><p>{t.noRecords}</p></div> : 
                             <ul style={{listStyle:'none', padding:0, margin:0}}>
                                 {todayRecords.map(r => (
-                                    <li key={r.id} className="record-item" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px', borderBottom:'1px solid #F9F9F9'}}>
+                                    <li key={r.id} className="record-item" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px', borderBottom:'1px solid var(--border-color)'}}>
                                         <div style={{display:'flex', alignItems:'center'}}>
-                                            <div className="item-icon-small" style={{width:'44px', height:'44px', background:'#F7F7F7', borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px'}}>
+                                            <div className="item-icon-small" style={{width:'44px', height:'44px', background:'var(--card-bg)', border:'1px solid var(--border-color)', borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px'}}>
                                                 <span>{r.activityType === 'wakeup' ? '🌅' : r.type === 'sport' ? '💪' : '📝'}</span>
                                             </div>
                                             <div style={{marginLeft:'14px'}}>
                                                 <p className="item-name" style={{margin:0, fontWeight:'800', fontSize:'15px'}}>{r.name}</p>
                                                 <p style={{fontSize:'12px', color:'var(--text-soft)', margin:'2px 0 0', fontWeight:'600'}}>
                                                     {r.activityType === 'wakeup' && `🕒 ${r.time}`}
-                                                    {r.activityType === 'cardio' && `⏱️ ${r.duration}min · 📍 ${r.distance}${r.unit}`}
+                                                    {r.activityType === 'cardio' && `⏱️ ${r.duration}${t.min} ${r.distance ? `· 📍 ${r.distance}${r.unit}` : ''}`}
                                                     {r.activityType === 'strength' && `🔥 ${r.sets}${t.groups} · 🔢 ${r.count}${t.times}`}
-                                                    {(r.activityType === 'habit' || r.activityType === 'general') && `⏱️ ${r.duration}min`}
+                                                    {(r.activityType === 'habit' || r.activityType === 'general') && `⏱️ ${r.duration}${t.min}`}
                                                 </p>
                                             </div>
                                         </div>
@@ -502,62 +520,59 @@ function App() {
     };
 
     return (
-        <div className={`app-container`}>
-            {showSuccess && (
-                <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
-            )}
-            <main className="content-area">
-                {view === 'home' && renderHome()}
-                {view === 'checkin' && <CheckinSelection t={t} checkinSubTab={checkinSubTab} setCheckinSubTab={setCheckinSubTab} setSelectedItem={setSelectedItem} handleAddRecord={handleAddRecord} setView={setView} selectedItem={selectedItem} editName={editName} setEditName={setEditName} />}
-                {view === 'food' && (
-                    <div className="view">
-                        <div className="sub-header">
-                            <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                            <h2>AI {t.calories}</h2>
-                        </div>
-                        <div className="detail-card" style={{background:'var(--card-bg)', padding:'32px', borderRadius:'40px', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-soft)'}}>
-                            {isAnalyzing ? (
-                                <div style={{textAlign:'center', padding:'40px 0'}}>
-                                    <div className="loading-spinner" style={{width:'48px', height:'48px', border:'4px solid var(--accent-light)', borderTopColor:'var(--accent)', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto 20px'}}></div>
-                                    <p style={{fontWeight:'700', color:'var(--text-soft)'}}>分析中...</p>
-                                </div>
-                            ) : calorieResult ? (
-                                <div style={{animation:'fadeIn 0.5s ease'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px', paddingBottom:'16px', borderBottom:'2px dashed var(--accent-light)'}}>
-                                        <div style={{fontSize:'32px'}}>🥗</div>
-                                        <h3 style={{margin:0, fontSize:'20px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
-                                    </div>
-                                    <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>{calorieResult}</div>
-                                    <button 
-                                        onClick={() => setCalorieResult(null)} 
-                                        className="btn-confirm highlight" 
-                                        style={{marginTop:'32px', width:'100%', height:'56px'}}
-                                    >
-                                        🔄 {t.rescan}
-                                    </button>
-                                </div>
-                            ) : (
-                                <label style={{cursor:'pointer', display:'block', textAlign:'center', padding:'40px 0'}}>
-                                    <input type="file" hidden onChange={handleImageUpload} />
-                                    <div style={{width:'100px', height:'100px', background:'var(--card-orange)', borderRadius:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', margin:'0 auto 24px', boxShadow:'0 8px 20px rgba(255,150,113,0.1)'}}>📸</div>
-                                    <h3 style={{fontSize:'20px', fontWeight:'850', color:'var(--text-main)'}}>{t.scanFood}</h3>
-                                    <p style={{color:'var(--text-soft)', marginTop:'8px', fontWeight:'700', fontSize:'13px'}}>拍照即刻获知热量建议</p>
-                                </label>
-                            )}
-                        </div>
-                    </div>
+        <>
+            {isAppLoading && <SplashScreen t={t} onFinish={() => setIsAppLoading(false)} />}
+            <div className={`app-container ${isAppLoading ? 'hidden' : 'fade-in-ready'}`}>
+                {showSuccess && (
+                    <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
                 )}
-                {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
-                {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
-                {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
-            </main>
-            <nav className="bottom-nav">
-                <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
-                <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></button>
-                <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}><FoodIcon active={view === 'food'} /><span>{t.calories}</span></button>
-                <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></button>
-            </nav>
-        </div>
+                <main className="content-area">
+                    {view === 'home' && renderHome()}
+                    {view === 'checkin' && <CheckinSelection t={t} checkinSubTab={checkinSubTab} setCheckinSubTab={setCheckinSubTab} setSelectedItem={setSelectedItem} handleAddRecord={handleAddRecord} setView={setView} selectedItem={selectedItem} editName={editName} setEditName={setEditName} settings={settings} />}
+                    {view === 'food' && (
+                        <div className="view">
+                            <div className="sub-header">
+                                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
+                                <h2>AI {t.calories}</h2>
+                            </div>
+                            <div className="detail-card" style={{background:'var(--card-bg)', padding:'32px', borderRadius:'40px', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-soft)'}}>
+                                {isAnalyzing ? (
+                                    <div style={{textAlign:'center', padding:'40px 0'}}>
+                                        <div className="loading-spinner" style={{width:'48px', height:'48px', border:'4px solid var(--accent-light)', borderTopColor:'var(--accent)', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto 20px'}}></div>
+                                        <p style={{fontWeight:'700', color:'var(--text-soft)'}}>分析中...</p>
+                                    </div>
+                                ) : calorieResult ? (
+                                    <div style={{animation:'fadeIn 0.5s ease'}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px', paddingBottom:'16px', borderBottom:'2px dashed var(--accent-light)'}}>
+                                            <div style={{fontSize:'32px'}}>🥗</div>
+                                            <h3 style={{margin:0, fontSize:'20px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
+                                        </div>
+                                        <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>{calorieResult}</div>
+                                        <button onClick={() => setCalorieResult(null)} className="btn-confirm highlight" style={{marginTop:'32px', width:'100%', height:'56px'}}>🔄 {t.rescan}</button>
+                                    </div>
+                                ) : (
+                                    <label style={{cursor:'pointer', display:'block', textAlign:'center', padding:'40px 0'}}>
+                                        <input type="file" hidden onChange={handleImageUpload} />
+                                        <div style={{width:'100px', height:'100px', background:'var(--card-orange)', borderRadius:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', margin:'0 auto 24px', boxShadow:'0 8px 20px rgba(255,150,113,0.1)'}}>📸</div>
+                                        <h3 style={{fontSize:'20px', fontWeight:'850', color:'var(--text-main)'}}>{t.scanFood}</h3>
+                                        <p style={{color:'var(--text-soft)', marginTop:'8px', fontWeight:'700', fontSize:'13px'}}>拍照即刻获知热量建议</p>
+                                    </label>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
+                    {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
+                    {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
+                </main>
+                <nav className="bottom-nav">
+                    <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
+                    <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></button>
+                    <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}><FoodIcon active={view === 'food'} /><span>{t.calories}</span></button>
+                    <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></button>
+                </nav>
+            </div>
+        </>
     );
 }
 
@@ -575,51 +590,15 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             const ua = navigator.userAgent;
             const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
             const isQuark = /Quark/.test(ua);
-            
             if (isQuark) setGuideType('quark');
             else if (isIOS) setGuideType('ios');
             else setGuideType('default');
         }
     };
 
-    const requestNotificationPermission = async () => {
-        if (typeof Notification === 'undefined') {
-            alert(t.notif.permissionDenied);
-            return false;
-        }
-        if (Notification.permission !== 'granted') {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                alert(t.notif.permissionDenied);
-                return false;
-            }
-        }
-        return true;
-    };
-
-    const handleToggleCheckInReminder = async (checked: boolean) => {
-        if (checked) {
-            if (await requestNotificationPermission()) updateReminders({ checkInEnabled: true });
-        } else {
-            updateReminders({ checkInEnabled: false });
-        }
-    };
-
-    const handleToggleFixedReminder = async (checked: boolean) => {
-        if (checked) {
-            if (await requestNotificationPermission()) updateReminders({ fixedReminderEnabled: true });
-        } else {
-            updateReminders({ fixedReminderEnabled: false });
-        }
-    };
-
     return (
         <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                <h2>{t.settings}</h2>
-            </div>
-
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.settings}</h2></div>
             <section className="settings-section">
                 <h4 className="category-title">{t.general}</h4>
                 <div className="settings-card">
@@ -637,107 +616,32 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             <span className="slider"></span>
                         </label>
                     </div>
-                    {settings.darkModeType === 'manual' && (
-                        <div className="setting-item">
-                            <span>{t.manualControl}</span>
-                            <label className="cream-switch">
-                                <input type="checkbox" checked={settings.manualDarkMode} onChange={e => update({ manualDarkMode: e.target.checked })} />
-                                <span className="slider"></span>
-                            </label>
-                        </div>
-                    )}
-                    <button className="setting-item-btn" onClick={handleInstall} style={{ borderBottom: 'none' }}>
-                        <span>{t.addToHome}</span>
-                        <span style={{ fontSize: '18px', color: 'var(--accent)' }}>📲</span>
-                    </button>
+                    <button className="setting-item-btn" onClick={handleInstall} style={{ borderBottom: 'none' }}><span>{t.addToHome}</span><span style={{ fontSize: '18px', color: 'var(--accent)' }}>📲</span></button>
                 </div>
             </section>
-
             <section className="settings-section">
                 <h4 className="category-title">{t.reminder.title}</h4>
                 <div className="settings-card">
                     <div className="setting-item">
-                        <div style={{display:'flex', flexDirection:'column'}}>
-                            <span>{t.reminder.checkIn}</span>
-                            <small style={{fontSize:'10px', color: (typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>
-                                {(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}
-                            </small>
-                        </div>
-                        <label className="cream-switch">
-                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => handleToggleCheckInReminder(e.target.checked)} />
-                            <span className="slider"></span>
-                        </label>
+                        <div style={{display:'flex', flexDirection:'column'}}><span>{t.reminder.checkIn}</span><small style={{fontSize:'10px', color: (typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>{(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}</small></div>
+                        <label className="cream-switch"><input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} /><span className="slider"></span></label>
                     </div>
-
-                    <div className="setting-item">
-                        <span>{t.reminder.fixedReminder}</span>
-                        <label className="cream-switch">
-                            <input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => handleToggleFixedReminder(e.target.checked)} />
-                            <span className="slider"></span>
-                        </label>
-                    </div>
-                    {settings.reminders.fixedReminderEnabled && (
-                        <div className="setting-item">
-                            <span>{t.reminder.fixedTime}</span>
-                            <input 
-                                type="time" 
-                                className="time-input-simple" 
-                                style={{maxWidth:'100px'}} 
-                                value={settings.reminders.fixedReminderTime} 
-                                onChange={e => updateReminders({ fixedReminderTime: e.target.value })} 
-                            />
-                        </div>
-                    )}
-
-                    <div className="setting-item">
-                        <span>{t.reminder.interval} (min)</span>
-                        <div className="segment-control small">
-                            {[10, 30, 60].map(v => (
-                                <button key={v} className={settings.reminders.interval === v ? 'active' : ''} onClick={() => updateReminders({ interval: v })}>{v}</button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="setting-item vertical">
-                        <span>{t.reminder.dnd}</span>
-                        <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '8px' }}>
-                            <input type="time" className="time-input-simple" value={settings.reminders.dndStart} onChange={e => updateReminders({ dndStart: e.target.value })} />
-                            <span style={{ alignSelf: 'center', opacity: 0.3 }}>-</span>
-                            <input type="time" className="time-input-simple" value={settings.reminders.dndEnd} onChange={e => updateReminders({ dndEnd: e.target.value })} />
-                        </div>
-                    </div>
+                    <div className="setting-item"><span>{t.reminder.fixedReminder}</span><label className="cream-switch"><input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => updateReminders({ fixedReminderEnabled: e.target.checked })} /><span className="slider"></span></label></div>
+                    {settings.reminders.fixedReminderEnabled && <div className="setting-item"><span>{t.reminder.fixedTime}</span><input type="time" className="time-input-simple" style={{maxWidth:'100px'}} value={settings.reminders.fixedReminderTime} onChange={e => updateReminders({ fixedReminderTime: e.target.value })} /></div>}
                 </div>
             </section>
-
             <section className="settings-section">
                 <h4 className="category-title">{t.storage}</h4>
                 <div className="settings-card">
-                    <div className="setting-item">
-                        <span>{t.storageUsage}</span>
-                        <span style={{ fontWeight: '800', color: 'var(--text-soft)' }}>{records.length} {t.statLabels.items}</span>
-                    </div>
-                    <button className="setting-action-btn danger" onClick={() => {
-                        if (confirm(t.confirmClear)) {
-                            setRecords([]);
-                            localStorage.removeItem('jq_records');
-                        }
-                    }}>
-                        {t.clearCache}
-                    </button>
+                    <button className="setting-action-btn danger" onClick={() => { if (confirm(t.confirmClear)) { setRecords([]); localStorage.removeItem('jq_records'); } }}>{t.clearCache}</button>
                 </div>
             </section>
-
             {guideType && (
                 <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent:'center', padding: '24px' }}>
                     <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', background: 'white' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
-                            {guideType === 'ios' ? '📱' : guideType === 'quark' ? '🧭' : '✨'}
-                        </div>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>{guideType === 'ios' ? '📱' : '🧭'}</div>
                         <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '850' }}>{t.addToHome}</h3>
-                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>
-                            {guideType === 'ios' && t.addToHomeGuideIOS}
-                            {guideType === 'quark' && t.addToHomeGuideQuark}
-                            {guideType === 'default' && t.addToHomeGuideDefault}
-                        </p>
+                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>{guideType === 'ios' ? t.addToHomeGuideIOS : guideType === 'quark' ? t.addToHomeGuideQuark : t.addToHomeGuideDefault}</p>
                         <button onClick={() => setGuideType(null)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
                     </div>
                 </div>
@@ -750,116 +654,25 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
     const [newDate, setNewDate] = useState('');
-    const [newCat, setNewCat] = useState<'love' | 'birthday' | 'life' | 'goal'>('life');
-    const [showValentine, setShowValentine] = useState(false);
-
-    useEffect(() => {
-        const now = new Date();
-        const isFeb14 = now.getMonth() === 1 && now.getDate() === 14;
-        if (isFeb14) {
-            setShowValentine(true);
-        }
-    }, []);
-
-    const handleAdd = () => {
-        if (!newName || !newDate) return;
-        const item: Anniversary = { id: Math.random().toString(36).substr(2, 9), name: newName, date: newDate, category: newCat };
-        setAnniversaries([...anniversaries, item]);
-        setNewName(''); setNewDate(''); setShowAdd(false);
-    };
-
-    const handleDelete = (id: string) => {
-        if (confirm(t.anniv.confirmDel)) {
-            setAnniversaries(anniversaries.filter((a: Anniversary) => a.id !== id));
-        }
-    };
-
-    const calculateDays = (dateStr: string) => {
-        const target = new Date(dateStr).setHours(0,0,0,0);
-        const today = new Date().setHours(0,0,0,0);
-        const diff = Math.floor((target - today) / (1000 * 60 * 60 * 24));
-        return { diff, isPast: diff < 0 };
-    };
-
-    const getIcon = (cat: string) => {
-        switch(cat) {
-            case 'love': return { emoji: '❤️', color: 'var(--card-pink)' };
-            case 'birthday': return { emoji: '🎂', color: 'var(--card-orange)' };
-            case 'goal': return { emoji: '🎯', color: 'var(--card-blue)' };
-            default: return { emoji: '🌱', color: 'var(--card-purple)' };
-        }
-    };
-
+    const handleAdd = () => { if (!newName || !newDate) return; const item: Anniversary = { id: Math.random().toString(36).substr(2, 9), name: newName, date: newDate, category: 'life' }; setAnniversaries([...anniversaries, item]); setNewName(''); setNewDate(''); setShowAdd(false); };
     return (
         <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                <h2>{t.anniv.title}</h2>
-            </div>
-
-            <div className="anniv-stats" style={{display:'flex', justifyContent:'space-between', padding:'0 8px 24px'}}>
-                <span style={{fontSize:'13px', fontWeight:'700', color:'var(--text-soft)'}}>已收录 {anniversaries.length} 个瞬间</span>
-                <button onClick={() => setShowAdd(true)} style={{fontSize:'13px', fontWeight:'850', color:'var(--accent)'}}>+ {t.anniv.add}</button>
-            </div>
-
-            {anniversaries.length === 0 ? (
-                <div className="empty-state" style={{marginTop:'80px'}}>
-                    <div style={{fontSize:'64px', marginBottom:'16px', opacity:0.6}}>📅</div>
-                    <p style={{color:'var(--text-soft)', fontWeight:'600'}}>{t.anniv.empty}</p>
-                </div>
-            ) : (
-                <div className="anniv-list" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                    {anniversaries.map((a: Anniversary) => {
-                        const { diff, isPast } = calculateDays(a.date);
-                        const { emoji, color } = getIcon(a.category);
-                        return (
-                            <div key={a.id} className="anniv-card" onClick={() => handleDelete(a.id)} style={{background:'white', borderRadius:'32px', padding:'24px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:'var(--shadow-soft)'}}>
-                                <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
-                                    <div style={{width:'56px', height:'56px', background:color, borderRadius:'20px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'24px'}}>{emoji}</div>
-                                    <div>
-                                        <p style={{margin:0, fontWeight:'850', fontSize:'16px'}}>{a.name}</p>
-                                        <p style={{margin:'4px 0 0', fontSize:'12px', color:'var(--text-soft)', fontWeight:'600'}}>{a.date}</p>
-                                    </div>
-                                </div>
-                                <div style={{textAlign:'right'}}>
-                                    <p style={{margin:0, fontSize:'11px', fontWeight:'800', color:'var(--text-soft)', textTransform:'uppercase'}}>{isPast ? t.anniv.past : t.anniv.future}</p>
-                                    <p style={{margin:0, fontSize:'24px', fontWeight:'900', color:'var(--accent)'}}>{Math.abs(diff)}<span style={{fontSize:'12px', fontWeight:'700', marginLeft:'2px'}}>{t.anniv.day}</span></p>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {showValentine && (
-                <div className="valentine-overlay" style={{position:'fixed', inset:0, zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px', background:'rgba(255, 251, 248, 0.85)', backdropFilter:'blur(20px)', animation:'fadeIn 0.5s ease'}}>
-                    <div className="valentine-card" style={{background:'white', width:'100%', maxWidth:'320px', borderRadius:'48px', padding:'48px 24px', textAlign:'center', boxShadow:'0 20px 60px rgba(255, 107, 107, 0.15)', animation:'slideInUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'}}>
-                        <div className="heart-icon-floating" style={{fontSize:'72px', marginBottom:'24px', display:'inline-block', animation:'floating 3s ease-in-out infinite'}}>❤️</div>
-                        <h2 style={{margin:'0 0 16px', fontSize:'24px', fontWeight:'900', color:'var(--accent)'}}>{t.anniv.valentineTitle}</h2>
-                        <p style={{margin:'0 0 40px', fontSize:'15px', color:'var(--text-soft)', lineHeight:'1.6', fontWeight:'700'}}>{t.anniv.valentineWish}</p>
-                        <button onClick={() => setShowValentine(false)} className="btn-confirm highlight" style={{width:'100%', height:'64px', borderRadius:'24px'}}>{t.anniv.valentineBtn}</button>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.anniv.title}</h2></div>
+            <div className="anniv-stats" style={{display:'flex', justifyContent:'space-between', padding:'0 8px 24px'}}><span style={{fontSize:'13px', fontWeight:'700', color:'var(--text-soft)'}}>已收录 {anniversaries.length} 个瞬间</span><button onClick={() => setShowAdd(true)} style={{fontSize:'13px', fontWeight:'850', color:'var(--accent)'}}>+ {t.anniv.add}</button></div>
+            <div className="anniv-list" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+                {anniversaries.map((a: Anniversary) => (
+                    <div key={a.id} className="anniv-card" style={{background:'white', borderRadius:'32px', padding:'24px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:'var(--shadow-soft)'}}>
+                        <div><p style={{margin:0, fontWeight:'850', fontSize:'16px'}}>{a.name}</p><p style={{margin:'4px 0 0', fontSize:'12px', color:'var(--text-soft)'}}>{a.date}</p></div>
+                        <button onClick={() => {if(confirm(t.anniv.confirmDel)) setAnniversaries(anniversaries.filter((it:any)=>it.id !== a.id))}} style={{color:'#FF3B30', fontSize:'12px'}}>{t.anniv.delete}</button>
                     </div>
-                </div>
-            )}
-
+                ))}
+            </div>
             {showAdd && (
-                <div className="drawer-overlay" onClick={() => setShowAdd(false)} style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.1)', backdropFilter:'blur(4px)', zIndex:2000, display:'flex', alignItems:'flex-end'}}>
-                    <div className="drawer-content" onClick={e => e.stopPropagation()} style={{width:'100%', background:'white', borderTopLeftRadius:'40px', borderTopRightRadius:'40px', padding:'40px 24px', animation:'slideInUp 0.4s cubic-bezier(0, 0, 0.2, 1)'}}>
-                        <div style={{width:'40px', height:'4px', background:'#EEE', borderRadius:'2px', margin:'0 auto 32px'}}></div>
-                        <h3 style={{margin:'0 0 24px', textAlign:'center', fontSize:'20px', fontWeight:'850'}}>{t.anniv.add}</h3>
-                        
-                        <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
-                            <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder={t.anniv.name} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', fontSize:'16px', fontWeight:'700'}} />
-                            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', fontSize:'16px', fontWeight:'700'}} />
-                            
-                            <div className="preset-chips" style={{justifyContent:'center'}}>
-                                {(Object.keys(t.anniv.cats) as Array<'love' | 'birthday' | 'life' | 'goal'>).map(cat => (
-                                    <button key={cat} onClick={() => setNewCat(cat)} className={newCat === cat ? 'active' : ''}>{t.anniv.cats[cat]}</button>
-                                ))}
-                            </div>
-
-                            <button onClick={handleAdd} className="btn-confirm highlight" style={{marginTop:'12px', width:'100%'}}>{t.complete} ✨</button>
-                        </div>
+                <div className="drawer-overlay" onClick={() => setShowAdd(false)} style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.1)', zIndex:2000, display:'flex', alignItems:'flex-end'}}>
+                    <div className="drawer-content" onClick={e => e.stopPropagation()} style={{width:'100%', background:'white', borderTopLeftRadius:'40px', borderTopRightRadius:'40px', padding:'40px 24px'}}>
+                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder={t.anniv.name} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', marginBottom:'16px'}} />
+                        <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', marginBottom:'16px'}} />
+                        <button onClick={handleAdd} className="btn-confirm highlight" style={{width:'100%'}}>{t.complete} ✨</button>
                     </div>
                 </div>
             )}
@@ -867,293 +680,58 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
     );
 }
 
-function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem, handleAddRecord, setView, selectedItem, editName, setEditName }: any) {
+function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem, handleAddRecord, setView, selectedItem, editName, setEditName, settings }: any) {
     const isZh = t.langOptions.zh === '中文简体';
-    const [localValues, setLocalValues] = useState<any>({
-        duration: 30, distance: 0, count: 0, sets: 0, time: '07:30', unit: 'km'
-    });
-
-    const adjust = (key: string, delta: number) => {
-        setLocalValues((p: any) => ({ ...p, [key]: Math.max(0, Number((p[key] + delta).toFixed(1))) }));
-    };
+    const [duration, setDuration] = useState<number>(30);
+    const [distance, setDistance] = useState<number>(5);
+    const [unit, setUnit] = useState<string>('km');
+    const [count, setCount] = useState<number>(10);
+    const [sets, setSets] = useState<number>(3);
+    const [wakeupTime, setWakeupTime] = useState<string>('07:00');
 
     const SPORT_CATS = [
-        { title: t.categories.cardio, color:'var(--card-blue)', items: [
-            {name: isZh?'晨跑':'Morning Run', icon: '🏃', type: 'cardio'}, 
-            {name: isZh?'游泳':'Swimming', icon: '🏊', type: 'cardio'}, 
-            {name: isZh?'自行车':'Cycling', icon: '🚲', type: 'cardio'}, 
-            {name: isZh?'步行':'Walking', icon: '🚶', type: 'cardio'},
-            {name: isZh?'羽毛球':'Badminton', icon: '🏸', type: 'cardio'},
-            {name: isZh?'跳绳':'Jump Rope', icon: '➰', type: 'strength'},
-            {name: isZh?'登山':'Climbing', icon: '🧗', type: 'cardio'}
-        ] },
-        { title: t.categories.strength, color:'var(--card-orange)', items: [
-            {name: isZh?'深蹲':'Squat', icon: '💪', type: 'strength'}, 
-            {name: isZh?'俯卧撑':'Push-ups', icon: '🏋️', type: 'strength'}, 
-            {name: isZh?'核心':'Core', icon: '🧘', type: 'strength'},
-            {name: isZh?'瑜伽':'Yoga', icon: '🧘‍♀️', type: 'strength'},
-            {name: isZh?'HIIT':'HIIT', icon: '🔥', type: 'strength'}
-        ] }
+        { title: t.categories.cardio, color: 'var(--card-blue)', items: [ { name: isZh ? '跑步' : 'Running', icon: '🏃', type: 'cardio' }, { name: isZh ? '游泳' : 'Swimming', icon: '🏊', type: 'cardio' } ] },
+        { title: t.categories.strength, color: 'var(--card-pink)', items: [ { name: isZh ? '俯卧撑' : 'Push-ups', icon: '💪', type: 'strength' }, { name: isZh ? '深蹲' : 'Squats', icon: '🦵', type: 'strength' } ] }
     ];
-    const LIFE_CATS = [
-        { title: t.categories.habits, color:'var(--card-purple)', items: [
-            {name: isZh?'早起':'Early Bird', icon: '🌅', type: 'wakeup'}, 
-            {name: isZh?'多喝水':'Drink Water', icon: '💧', type: 'habit'}, 
-            {name: isZh?'阅读':'Reading', icon: '📖', type: 'habit'},
-            {name: isZh?'冥想':'Meditation', icon: '🧠', type: 'habit'},
-            {name: isZh?'护肤':'Skincare', icon: '✨', type: 'habit'}
-        ] }
-    ];
-    
+    const LIFE_CATS = [ { title: t.categories.habits, color: 'var(--card-purple)', items: [ { name: isZh ? '早起' : 'Early Bird', icon: '🌅', type: 'wakeup' }, { name: isZh ? '多喝水' : 'Drink Water', icon: '💧', type: 'habit' } ] } ];
     const cats = checkinSubTab === 'sport' ? SPORT_CATS : LIFE_CATS;
-    const openDetail = (item: any) => { 
-        setSelectedItem(item); 
-        setEditName(item.name.includes('自定义') || item.name.includes('Custom') ? '' : item.name); 
-    };
 
     if (selectedItem) return (
         <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setSelectedItem(null)} className="back-btn-square">⬅️</button>
-                <h2>{t.checkinDetails}</h2>
-            </div>
-            
-            <div className="detail-hero">
-                <div className="detail-icon-wrap">{selectedItem.icon}</div>
-                <div className="detail-title-group">
-                    <span className="detail-cat-tag">{selectedItem.category}</span>
-                    <input 
-                        type="text" 
-                        className="detail-name-input" 
-                        placeholder={t.matterName} 
-                        value={editName} 
-                        onChange={(e)=>setEditName(e.target.value)}
-                    />
+            <div className="sub-header"><button onClick={() => setSelectedItem(null)} className="back-btn-square">⬅️</button><h2>{t.checkinDetails}</h2></div>
+            <div className="detail-hero" style={{marginBottom: '32px'}}><div className="detail-icon-wrap" style={{background: 'var(--card-bg)', border: '1px solid var(--border-color)'}}>{selectedItem.icon}</div><div className="detail-title-group"><input type="text" className="detail-name-input" value={editName} onChange={(e) => setEditName(e.target.value)} /></div></div>
+            <div className="settings-section">
+                <div className="settings-card" style={{padding: '12px 20px'}}>
+                    {selectedItem.type === 'cardio' && <>
+                        <div className="setting-item"><span>⏱️ {t.duration} ({t.min})</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
+                        <div className="setting-item"><span>📍 {t.distance}</span><div style={{display: 'flex', gap: '8px'}}><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={distance} onChange={e => setDistance(Number(e.target.value))} /><div className="segment-control"><button className={unit === 'km' ? 'active' : ''} onClick={() => setUnit('km')}>km</button><button className={unit === 'm' ? 'active' : ''} onClick={() => setUnit('m')}>m</button></div></div></div>
+                    </>}
+                    {selectedItem.type === 'strength' && <>
+                        <div className="setting-item"><span>🔥 {t.sets}</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={sets} onChange={e => setSets(Number(e.target.value))} /></div>
+                        <div className="setting-item"><span>🔢 {t.count} ({t.times})</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={count} onChange={e => setCount(Number(e.target.value))} /></div>
+                    </>}
+                    {selectedItem.type === 'wakeup' && <div className="setting-item"><span>🕒 {t.wakeTime}</span><input type="time" className="time-input-simple" value={wakeupTime} onChange={e => setWakeupTime(e.target.value)} /></div>}
                 </div>
             </div>
-
-            <div className="detail-options-card">
-                {selectedItem.type === 'wakeup' && (
-                    <div className="option-group">
-                        <label>{t.wakeTime}</label>
-                        <div className="time-select-hero">
-                            <input type="time" value={localValues.time} onChange={(e)=>setLocalValues((p:any)=>({...p, time: e.target.value}))}/>
-                            <span style={{fontSize:'32px', color:'var(--accent)', opacity:0.3}}>🕒</span>
-                        </div>
-                    </div>
-                )}
-
-                {selectedItem.type === 'cardio' && (
-                    <>
-                        <div className="option-group">
-                            <div className="option-header">
-                                <label>{t.duration}</label>
-                                <span className="option-val-display">{localValues.duration} <small>{t.min}</small></span>
-                            </div>
-                            <input type="range" className="peach-range" min="0" max="180" step="5" value={localValues.duration} onChange={(e)=>setLocalValues((p:any)=>({...p, duration: parseInt(e.target.value)}))}/>
-                            <div className="preset-chips">
-                                {[15, 30, 45, 60].map(v => (
-                                    <button key={v} onClick={()=>setLocalValues((p:any)=>({...p, duration: v}))} className={localValues.duration === v ? 'active' : ''}>
-                                        {v}{t.min}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="option-group">
-                            <label>{t.distance}</label>
-                            <div className="stepper-row minimalist">
-                                <button onClick={()=>adjust('distance', -0.5)} className="step-btn">−</button>
-                                <div className="stepper-value-block with-unit">
-                                    <span>{localValues.distance}</span>
-                                    <select className="unit-selector" value={localValues.unit} onChange={(e)=>setLocalValues((p:any)=>({...p, unit: e.target.value}))}>
-                                        <option value="km">km</option>
-                                        <option value="m">m</option>
-                                    </select>
-                                </div>
-                                <button onClick={()=>adjust('distance', 0.5)} className="step-btn">+</button>
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                {selectedItem.type === 'strength' && (
-                    <div className="strength-row-layout">
-                        <div className="option-group" style={{flex:1}}>
-                            <label style={{textAlign:'center'}}>{t.count}</label>
-                            <div className="stepper-row minimalist">
-                                <button onClick={()=>adjust('count', -1)} className="step-btn">−</button>
-                                <div className="stepper-value-block">
-                                    <span>{localValues.count}</span>
-                                </div>
-                                <button onClick={()=>adjust('count', 1)} className="step-btn">+</button>
-                            </div>
-                        </div>
-                        <div className="option-group" style={{flex:1}}>
-                            <label style={{textAlign:'center'}}>{t.sets}</label>
-                            <div className="stepper-row minimalist">
-                                <button onClick={()=>adjust('sets', -1)} className="step-btn">−</button>
-                                <div className="stepper-value-block">
-                                    <span>{localValues.sets}</span>
-                                </div>
-                                <button onClick={()=>adjust('sets', 1)} className="step-btn">+</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {selectedItem.type === 'habit' && (
-                    <div className="option-group">
-                        <div className="option-header">
-                            <label>{t.duration}</label>
-                            <span className="option-val-display">{localValues.duration} <small>{t.min}</small></span>
-                        </div>
-                        <input type="range" className="peach-range" min="0" max="180" step="5" value={localValues.duration} onChange={(e)=>setLocalValues((p:any)=>({...p, duration: parseInt(e.target.value)}))}/>
-                    </div>
-                )}
-
-                <div className="option-group" style={{marginTop:'4px'}}>
-                    <label style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                        写下此刻... <span style={{fontSize:'12px', fontWeight:'normal', opacity:0.6}}>🌱</span>
-                    </label>
-                    <textarea 
-                        id="note-area"
-                        className="moment-textarea minimalist" 
-                        placeholder="留下一段温暖的文字..."
-                        rows={3}
-                    />
-                </div>
-            </div>
-
-            <div className="detail-action-bar">
-                <button className="btn-cancel" onClick={()=>setSelectedItem(null)}>{t.nextTime}</button>
-                <button className="btn-confirm highlight" onClick={()=>{
-                    const note = (document.getElementById('note-area') as HTMLTextAreaElement).value;
-                    handleAddRecord({
-                        type: checkinSubTab,
-                        activityType: selectedItem.type,
-                        name: editName.trim() || selectedItem.name,
-                        category: selectedItem.category,
-                        note,
-                        ...localValues
-                    });
-                }}>
-                    {t.complete} ✨
-                </button>
-            </div>
+            <button className="btn-confirm highlight" onClick={() => handleAddRecord({ type: checkinSubTab, activityType: selectedItem.type, name: editName || selectedItem.name, category: selectedItem.category, duration, distance, unit, count, sets, time: wakeupTime })}>{t.complete} ✨</button>
         </div>
     );
 
     return (
         <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                <h2>{t.checkin}</h2>
-            </div>
-            
-            <div className="subtab-container">
-                <div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div>
-                <button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button>
-                <button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button>
-            </div>
-
-            <div key={checkinSubTab} className="category-fade-in">
-                {cats.map(c => (
-                    <div key={c.title} style={{marginBottom:'24px'}}>
-                        <h4 className="category-title">{c.title}</h4>
-                        <div className="grid-nav">
-                            {c.items.map(i => (
-                                <div key={i.name} className="nav-card" style={{background: 'white', boxShadow:'0 4px 12px rgba(0,0,0,0.02)'}} onClick={() => openDetail({...i, category: c.title})}>
-                                    <div className="icon-bg-wrap" style={{background: c.color}}><span style={{fontSize:'28px'}}>{i.icon}</span></div>
-                                    <span>{i.name}</span>
-                                </div>
-                            ))}
-                            <div className="nav-card custom-card" onClick={() => openDetail({name: isZh?'自定义':'Custom', icon: '📝', category: c.title, type: checkinSubTab === 'sport' ? 'strength' : 'habit'})}>
-                                <div className="icon-bg-wrap" style={{border:'2px dashed var(--accent-light)', background:'none', boxShadow:'none'}}><span style={{fontSize:'24px', color:'var(--accent)'}}>+</span></div>
-                                <span style={{color:'var(--accent)'}}>{isZh ? '自定义' : 'Custom'}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.checkin}</h2></div>
+            <div className="subtab-container"><div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div><button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button><button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button></div>
+            {cats.map(c => ( <div key={c.title}><h4 className="category-title">{c.title}</h4><div className="grid-nav">{c.items.map(i => ( <div key={i.name} className="nav-card" style={{background: 'var(--card-bg)', border: '1px solid var(--border-color)'}} onClick={() => {setSelectedItem({...i, category: c.title}); setEditName(i.name);}}><div className="icon-bg-wrap" style={{background: c.color}}><span>{i.icon}</span></div><span style={{fontWeight: '800', fontSize: '14px'}}>{i.name}</span></div> ))}</div></div> ))}
         </div>
     );
 }
 
 function StatsView({ t, statsData, setView, records }: any) {
     if (!statsData) return <div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div><div className="empty-state" style={{marginTop:'100px'}}><p>{t.noRecords}</p></div></div>;
-    const maxWeekly = Math.max(...statsData.weekly.map((w:any) => w.count), 1);
-    const getIcon = (type: ActivityType) => {
-        switch(type) {
-            case 'cardio': return '🏃';
-            case 'strength': return '🏋️';
-            case 'habit': return '💧';
-            case 'wakeup': return '🌅';
-            default: return '📝';
-        }
-    };
-    const getLabel = (type: ActivityType) => {
-        switch(type) {
-            case 'cardio': return t.categories.cardio;
-            case 'strength': return t.categories.strength;
-            case 'habit': return t.categories.habits;
-            case 'wakeup': return '早起';
-            default: return '日常';
-        }
-    };
-
     return (
         <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                <h2>{t.stats}</h2>
-            </div>
-            
-            <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', marginBottom:'24px'}}>
-                <div className="nav-card" style={{background:'var(--card-orange)', padding:'16px'}}>
-                    <span style={{fontSize:'12px', fontWeight:'800', opacity:0.6}}>{t.statLabels.streak}</span>
-                    <span style={{fontSize:'24px', fontWeight:'900'}}>{statsData.streak}</span>
-                </div>
-                <div className="nav-card" style={{background:'var(--card-blue)', padding:'16px'}}>
-                    <span style={{fontSize:'12px', fontWeight:'800', opacity:0.6}}>{t.statLabels.today}</span>
-                    <span style={{fontSize:'24px', fontWeight:'900'}}>{statsData.todayCount}</span>
-                </div>
-                <div className="nav-card" style={{background:'var(--card-pink)', padding:'16px'}}>
-                    <span style={{fontSize:'12px', fontWeight:'800', opacity:0.6}}>{t.statLabels.total}</span>
-                    <span style={{fontSize:'24px', fontWeight:'900'}}>{records.length}</span>
-                </div>
-            </div>
-
-            <div style={{background:'white', borderRadius:'32px', padding:'24px', boxShadow:'var(--shadow-soft)', marginBottom:'24px'}}>
-                <h4 style={{margin:'0 0 20px', fontSize:'16px', fontWeight:'850'}}>{t.statLabels.weekly}</h4>
-                <div style={{height:'120px', display:'flex', alignItems:'flex-end', justifyContent:'space-around'}}>
-                    {statsData.weekly.map((w:any, i:number) => (
-                        <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px'}}>
-                            <div style={{width:'10px', height:`${(w.count / maxWeekly) * 100}%`, background: i === 6 ? 'var(--accent-gradient)' : '#F2F2F7', borderRadius:'5px', minHeight:'6px', transition:'height 0.8s ease-out'}}></div>
-                            <span style={{fontSize:'10px', fontWeight:'800', color: i===6 ? 'var(--accent)' : 'var(--text-soft)'}}>{w.label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div style={{background:'white', borderRadius:'32px', padding:'24px', boxShadow:'var(--shadow-soft)'}}>
-                <h4 style={{margin:'0 0 20px', fontSize:'16px', fontWeight:'850'}}>{t.statLabels.distribution}</h4>
-                <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                    {statsData.distribution.map((d:any) => (
-                        <div key={d.type} style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                            <div style={{width:'36px', height:'36px', background:'#F9F9F9', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px'}}>{getIcon(d.type)}</div>
-                            <div style={{flex:1}}>
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
-                                    <span style={{fontSize:'13px', fontWeight:'800'}}>{getLabel(d.type)}</span>
-                                    <span style={{fontSize:'13px', fontWeight:'800', color:'var(--text-soft)'}}>{d.percentage}%</span>
-                                </div>
-                                <div style={{height:'6px', background:'#F2F2F7', borderRadius:'3px', overflow:'hidden'}}>
-                                    <div style={{width:`${d.percentage}%`, height:'100%', background:'var(--accent-gradient)'}}></div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px', marginBottom:'24px'}}><div className="nav-card" style={{background:'var(--card-orange)'}}><span>连续</span><span>{statsData.streak}</span></div><div className="nav-card" style={{background:'var(--card-blue)'}}><span>今日</span><span>{statsData.todayCount}</span></div><div className="nav-card" style={{background:'var(--card-pink)'}}><span>累计</span><span>{records.length}</span></div></div>
         </div>
     );
 }
