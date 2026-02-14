@@ -429,6 +429,8 @@ function App() {
     const [editName, setEditName] = useState('');
     const [calorieResult, setCalorieResult] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
+    const [showFullResult, setShowFullResult] = useState(false);
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
@@ -582,7 +584,9 @@ function App() {
         // proceed to send image to serverless proxy; server reports errors if misconfigured
         const reader = new FileReader();
         reader.onloadend = async () => {
-            const base64Data = (reader.result as string).split(',')[1];
+            const dataUrl = (reader.result as string);
+            setUploadedDataUrl(dataUrl);
+            const base64Data = dataUrl.split(',')[1];
             try {
                 const prompt = settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English.";
                 const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
@@ -702,12 +706,29 @@ function App() {
                                     </div>
                                 ) : calorieResult ? (
                                     <div style={{animation:'fadeIn 0.5s ease'}}>
-                                        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px', paddingBottom:'16px', borderBottom:'2px dashed var(--accent-light)'}}>
-                                            <div style={{fontSize:'32px'}}>🥗</div>
-                                            <h3 style={{margin:0, fontSize:'20px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
+                                        <div style={{display:'flex', gap:'18px', alignItems:'flex-start', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
+                                            {uploadedDataUrl && (
+                                                <div style={{flex: '0 0 140px'}}>
+                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'140px', height:'140px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)'}} />
+                                                </div>
+                                            )}
+                                            <div style={{flex: 1}}>
+                                                <h3 style={{margin:'0 0 8px', fontSize:'18px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
+                                                <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>
+                                                    {(() => {
+                                                        const max = 600;
+                                                        if (showFullResult || calorieResult.length <= max) return calorieResult;
+                                                        return calorieResult.slice(0, max) + '…';
+                                                    })()}
+                                                </div>
+                                                {calorieResult.length > 600 && (
+                                                    <button onClick={() => setShowFullResult(s => !s)} className="link-btn" style={{marginTop:'12px'}}>{showFullResult ? '收起' : '展开全文'}</button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>{calorieResult}</div>
-                                        <button onClick={() => setCalorieResult(null)} className="btn-confirm highlight" style={{marginTop:'32px', width:'100%', height:'56px'}}>🔄 {t.rescan}</button>
+                                        <div style={{display:'flex', gap:'12px'}}>
+                                            <button onClick={() => { setCalorieResult(null); setUploadedDataUrl(null); setShowFullResult(false); }} className="btn-confirm highlight" style={{marginTop:'0', width:'100%', height:'56px'}}>🔄 {t.rescan}</button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <label style={{cursor:'pointer', display:'block', textAlign:'center', padding:'40px 0'}}>
