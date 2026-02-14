@@ -254,58 +254,26 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
     );
 };
 
-// Doubao API config (read from injected env)
-const DOUBAO_API_KEY = (typeof process !== 'undefined' && (process.env as any).DOUBAO_API_KEY) || '';
-// Safety: log presence (not value) to help debug build-time injection on deployment
-try {
-    // eslint-disable-next-line no-console
-    console.log('DOUBAO_API_KEY present?', !!DOUBAO_API_KEY, 'type:', typeof DOUBAO_API_KEY);
-} catch (e) { }
+// Frontend uses server proxy `/api/doubao`; no client-side secret required.
 
 async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, prompt: string) {
-    try {
-        const payload = {
-            model: 'doubao-seed-1-8-251228',
-            inputs: [
-                { type: 'image', data: base64Data, mime: mimeType },
-                { type: 'text', text: prompt }
-            ]
-        };
+    const model = 'doubao-seed-1-8-251228';
 
-        const resp = await fetch('https://api.doubao.com/v1/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${DOUBAO_API_KEY}`
-            },
-            body: JSON.stringify(payload)
-        });
+    const resp = await fetch('/api/doubao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Data, mimeType, prompt, model })
+    });
 
-        if (!resp.ok) {
-            const txt = await resp.text();
-            throw new Error(`Doubao API error: ${resp.status} ${txt}`);
-        }
-
-        const data = await resp.json();
-        // Flexible parsing for various possible Doubao response shapes
-        // Examples handled: { text }, { output }, { result: { text } }, { outputs: [{ content }] }, choices[], data[]
-        if (!data) return '';
-        if (typeof data === 'string') return data;
-        if (data.text) return data.text;
-        if (data.output) return data.output;
-        if (data.result && data.result.text) return data.result.text;
-        if (Array.isArray(data.outputs) && data.outputs[0]) {
-            const o = data.outputs[0];
-            return o.content || o.text || JSON.stringify(o);
-        }
-        if (Array.isArray(data.choices) && data.choices[0]) return data.choices[0].text || JSON.stringify(data.choices[0]);
-        if (Array.isArray(data.data) && data.data[0]) return data.data[0].text || data.data[0].output || JSON.stringify(data.data[0]);
-        if (data.response) return data.response;
-        return JSON.stringify(data);
-    } catch (err: any) {
-        console.error('callDoubaoImageAnalysis error', err);
-        throw err;
+    if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(`Proxy error: ${resp.status} ${txt}`);
     }
+
+
+    const json = await resp.json();
+    return json.result;
+}
 }
 
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
@@ -563,20 +531,24 @@ function App() {
         setIsAnalyzing(true);
         setCalorieResult(null);
 
-        if (!DOUBAO_API_KEY) {
-            setCalorieResult(settings.language === 'zh' ? 'API 密钥未配置，请在 .env.local 中设置 DOUBAO_API_KEY' : 'API key not configured — set DOUBAO_API_KEY in .env.local');
-            setIsAnalyzing(false);
-            return;
-        }
+        // proceed to send image to serverless proxy; server reports errors if misconfigured
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64Data = (reader.result as string).split(',')[1];
             try {
                 const prompt = settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English.";
-                const responseText = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
-                setCalorieResult(responseText || '');
-            } catch (err) {
-                setCalorieResult(settings.language === 'zh' ? '分析失败，请稍后重试' : 'Analysis failed, please try again later');
+                const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
+                // response may be the raw provider object; try to extract useful text
+                let textOutput = '';
+                if (!response) textOutput = '';
+                else if (typeof response === 'string') textOutput = response;
+                else if (response.output && typeof response.output === 'string') textOutput = response.output;
+                else if (response.result && typeof response.result === 'string') textOutput = response.result;
+                else textOutput = JSON.stringify(response, null, 2);
+                setCalorieResult(textOutput || '');
+            } catch (err: any) {
+                const msg = err?.message || String(err);
+                setCalorieResult(settings.language === 'zh' ? `分析失败：${msg}` : `Analysis failed: ${msg}`);
             } finally { setIsAnalyzing(false); }
         };
         reader.readAsDataURL(file);
@@ -667,11 +639,7 @@ function App() {
             {isAppLoading && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
             {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
             <div className={`app-container ${appReady ? 'fade-in-ready' : ''}`}>
-                {!DOUBAO_API_KEY && (
-                    <div className="api-key-warning">
-                        {settings.language === 'zh' ? 'API 密钥未配置：请在项目根目录创建 .env.local 并设置 DOUBAO_API_KEY，然后重新部署。' : 'API key not configured: create a .env.local at project root, set DOUBAO_API_KEY and redeploy.'}
-                    </div>
-                )}
+                
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
                 )}
