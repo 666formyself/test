@@ -671,3 +671,79 @@ body {
 /* 页面切换动画 */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .success-overlay { position: fixed; inset: 0; background: var(--bg-color); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.4s ease-out; }
+
+/* 启动页 / Splash Screen */
+.splash-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,250,245,0.9));
+    z-index: 12000;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.2,0.8,0.2,1);
+}
+
+.splash-overlay.fade-up { opacity: 0; transform: translateY(-18px) scale(0.98); pointer-events: none; }
+
+.splash-content {
+    width: 92%;
+    max-width: 380px;
+    background: transparent;
+    text-align: center;
+    padding: 28px 18px;
+    border-radius: 20px;
+}
+
+.splash-logo {
+    font-size: 56px;
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 28px;
+    background: radial-gradient(circle at 30% 20%, var(--accent-light), transparent 40%), var(--card-bg);
+    box-shadow: 0 14px 40px rgba(255,150,113,0.12);
+    animation: splashPop 900ms cubic-bezier(.2,.9,.3,1) forwards;
+}
+
+.splash-title { font-size: 22px; font-weight: 950; margin: 6px 0 0; color: var(--text-main); }
+.splash-subtitle { margin: 6px 0 14px; color: var(--text-soft); font-weight: 700; letter-spacing: 0.2px; }
+
+.splash-loader-track {
+    height: 8px;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(0,0,0,0.03), rgba(0,0,0,0.02));
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+}
+
+.splash-loader-bar {
+    position: absolute;
+    left: -40%;
+    top: 0; bottom: 0;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent-light));
+    border-radius: 999px;
+    animation: splashSlide 1.6s cubic-bezier(.22,.9,.3,1) infinite;
+    box-shadow: 0 6px 20px rgba(255,150,113,0.12);
+}
+
+@keyframes splashSlide {
+    0% { left: -45%; width: 30%; opacity: 0.6; }
+    50% { left: 30%; width: 45%; opacity: 1; }
+    100% { left: 110%; width: 30%; opacity: 0.6; }
+}
+
+@keyframes splashPop { from { transform: scale(.9) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+
+/* 减少运动偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .splash-logo, .splash-loader-bar, .app-container, .splash-overlay { animation: none !important; transition: none !important; }
+}
+
