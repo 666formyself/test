@@ -226,6 +226,24 @@ body {
     .bottom-nav { height: 76px; }
 }
 
+/* 周柱状图样式 */
+.week-bar { width: 100%; height: 100%; display:flex; align-items:flex-end; }
+.week-bar-inner { width: 80%; margin: 0 auto; background: linear-gradient(180deg,var(--accent),var(--accent-light)); border-radius: 8px 8px 6px 6px; transition: height 360ms cubic-bezier(.2,.9,.3,1); box-shadow: 0 6px 18px rgba(255,150,113,0.08); }
+
+/* 让图表在空数据时仍有占位显示 */
+.chart-card .week-bar { background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.02) 100%); border-radius: 8px; }
+
+/* 调整分布条的字体和间距 */
+.chart-card .type-label { font-weight: 800; color: var(--text-main); }
+
+/* 小屏下图表堆叠 */
+@media (max-width: 520px) {
+    .chart-card { padding: 14px; }
+    .chart-card h4 { font-size: 13px; }
+    .home-action-grid { grid-template-columns: 1fr; }
+    .view > .chart-card { margin-bottom: 12px; }
+}
+
 .action-card {
     height: 100px;
     border-radius: 28px;

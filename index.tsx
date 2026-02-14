@@ -966,29 +966,42 @@ function StatsView({ t, statsData, setView, records }: any) {
                     <h4 style={{margin:'0 0 8px'}}>{t.statLabels.weekly}</h4>
                     <div style={{display:'flex', alignItems:'flex-end', gap:'8px', height:140}}>
                         {(() => {
-                            const max = Math.max(...statsData.weekly.map((w: any) => w.count), 1);
-                            return statsData.weekly.map((w: any, idx: number) => (
-                                <div key={idx} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center'}}>
-                                    <div title={`${w.count} 次`} style={{width:'100%', height: Math.round((w.count / max) * 100) + '%', background:'linear-gradient(180deg,var(--accent),var(--accent-light))', borderRadius:6, transition:'height 300ms'}}></div>
-                                    <div style={{marginTop:8, fontSize:12, color:'var(--text-soft)'}}>{w.label}</div>
-                                </div>
-                            ));
+                            // ensure visibility: set baseMax to at least 1 so zero-data still shows tiny bars
+                            const vals = statsData.weekly.map((w: any) => Number(w.count) || 0);
+                            const max = Math.max(...vals, 1);
+                            return statsData.weekly.map((w: any, idx: number) => {
+                                const count = Number(w.count) || 0;
+                                // compute percent of column area (min 6% when non-zero)
+                                const pct = max === 0 ? 0 : Math.round((count / max) * 100);
+                                const heightPct = count === 0 ? 6 : Math.max(6, pct);
+                                return (
+                                    <div key={idx} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center'}}>
+                                        <div className="week-bar" title={`${w.label}: ${count} 次`}>
+                                            <div className="week-bar-inner" style={{height: `${heightPct}%`}}></div>
+                                        </div>
+                                        <div style={{marginTop:8, fontSize:12, color:'var(--text-soft)'}}>{w.label}</div>
+                                    </div>
+                                );
+                            });
                         })()}
                     </div>
+                    <div style={{marginTop:10, fontSize:12, color:'var(--text-soft)'}}>柱状图按周统计，数值越高代表活动越多</div>
                 </div>
                 <div className="chart-card" style={{padding:'18px', borderRadius:12, background:'var(--card-bg)', boxShadow:'var(--shadow-soft)'}}>
                     <h4 style={{margin:'0 0 8px'}}>{t.statLabels.distribution}</h4>
-                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                    <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
                         {statsData.distribution && statsData.distribution.length ? statsData.distribution.map((d: any, i: number) => {
                             const pct = d.percentage || Math.round((d.count / (records.length || 1)) * 100);
                             const colors = ['#FFB085','#8EC5FF','#FF9CCF','#FFD580','#C7F9CC','#D3C2FF'];
+                            const label = t.categories && (t.categories as any)[d.type] ? (t.categories as any)[d.type] : d.type;
                             return (
-                                <div key={i} style={{display:'flex', alignItems:'center', gap:8}}>
-                                    <div style={{width:100, fontSize:13, color:'var(--text-main)', fontWeight:700}}>{d.type}</div>
+                                <div key={i} style={{display:'flex', alignItems:'center', gap:10}}>
+                                    <div style={{width:12, height:12, borderRadius:3, background: colors[i % colors.length]}}></div>
+                                    <div style={{width:90, fontSize:13, color:'var(--text-main)', fontWeight:800}}>{label}</div>
                                     <div style={{flex:1, height:12, background:'var(--border-color)', borderRadius:6, overflow:'hidden'}}>
                                         <div style={{width: `${pct}%`, height:'100%', background: colors[i % colors.length]}}></div>
                                     </div>
-                                    <div style={{width:50, textAlign:'right', fontSize:13, color:'var(--text-soft)'}}>{pct}%</div>
+                                    <div style={{width:48, textAlign:'right', fontSize:13, color:'var(--text-soft)'}}>{pct}%</div>
                                 </div>
                             );
                         }) : <div style={{color:'var(--text-soft)'}}>暂无分布数据</div>}
