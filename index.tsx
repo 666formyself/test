@@ -557,6 +557,12 @@ function App() {
         if (!file) return;
         setIsAnalyzing(true);
         setCalorieResult(null);
+
+        if (!DOUBAO_API_KEY) {
+            setCalorieResult(settings.language === 'zh' ? 'API 密钥未配置，请在 .env.local 中设置 DOUBAO_API_KEY' : 'API key not configured — set DOUBAO_API_KEY in .env.local');
+            setIsAnalyzing(false);
+            return;
+        }
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64Data = (reader.result as string).split(',')[1];
