@@ -62,8 +62,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       imageUrl = await uploadToTransferOr0x0(filename, imgBuffer, mimeType || 'application/octet-stream');
     } catch (e: any) {
-      console.error('image upload errors:', e);
-      return res.status(502).json({ error: `Image upload failed: ${e?.message || String(e)}` });
+      console.warn('image upload errors, falling back to data URL:', e?.message || String(e));
+      // Fallback: use data URL in case external uploads are blocked. Some providers accept data URLs as image URLs.
+      try {
+        imageUrl = `data:${mimeType || 'application/octet-stream'};base64,${base64Data}`;
+      } catch (e2: any) {
+        console.error('data URL fallback failed:', e2);
+        return res.status(502).json({ error: `Image upload failed: ${e?.message || String(e)}` });
+      }
     }
 
     const payload = {
