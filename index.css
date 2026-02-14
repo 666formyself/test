@@ -187,6 +187,45 @@ body {
     margin: 20px 0;
 }
 
+/* 小型卡片样式（统计/导航卡） */
+.nav-card {
+    padding: 18px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.04);
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+.nav-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,0.08); }
+
+/* 图表容器 */
+.chart-card h4 { font-size: 14px; margin: 0 0 10px; font-weight: 900; color: var(--text-main); }
+.chart-card { border: 1px solid var(--border-color); }
+
+/* 周柱状图内柱子微交互 */
+.chart-card div[title] { cursor: default; }
+.chart-card div[title]:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(0,0,0,0.06); }
+
+/* 类型分布文字与条 */
+.chart-card .type-label { font-weight: 800; color: var(--text-main); }
+
+/* 调整卡片色块样式 */
+.nav-card span:first-child { font-size: 12px; font-weight: 800; color: var(--text-soft); }
+.nav-card span:last-child { font-size: 20px; font-weight: 900; color: var(--text-main); }
+
+/* 响应式调整 */
+@media (max-width: 720px) {
+    .app-container { padding-bottom: calc(140px + var(--safe-area-bottom)); }
+    .chart-card { padding: 14px; }
+    .home-action-grid { grid-template-columns: 1fr 1fr; }
+    .bottom-nav { height: 76px; }
+}
+
 .action-card {
     height: 100px;
     border-radius: 28px;

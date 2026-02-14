@@ -961,6 +961,40 @@ function StatsView({ t, statsData, setView, records }: any) {
                 <div className="nav-card" style={{background:'var(--card-blue)'}}><span>{t.statLabels.today}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{statsData.todayCount} {t.statLabels.items}</span></div>
                 <div className="nav-card" style={{background:'var(--card-pink)'}}><span>{t.statLabels.total}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{records.length} {t.statLabels.items}</span></div>
             </div>
+            <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'16px'}}>
+                <div className="chart-card" style={{padding:'18px', borderRadius:12, background:'var(--card-bg)', boxShadow:'var(--shadow-soft)'}}>
+                    <h4 style={{margin:'0 0 8px'}}>{t.statLabels.weekly}</h4>
+                    <div style={{display:'flex', alignItems:'flex-end', gap:'8px', height:140}}>
+                        {(() => {
+                            const max = Math.max(...statsData.weekly.map((w: any) => w.count), 1);
+                            return statsData.weekly.map((w: any, idx: number) => (
+                                <div key={idx} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center'}}>
+                                    <div title={`${w.count} 次`} style={{width:'100%', height: Math.round((w.count / max) * 100) + '%', background:'linear-gradient(180deg,var(--accent),var(--accent-light))', borderRadius:6, transition:'height 300ms'}}></div>
+                                    <div style={{marginTop:8, fontSize:12, color:'var(--text-soft)'}}>{w.label}</div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                </div>
+                <div className="chart-card" style={{padding:'18px', borderRadius:12, background:'var(--card-bg)', boxShadow:'var(--shadow-soft)'}}>
+                    <h4 style={{margin:'0 0 8px'}}>{t.statLabels.distribution}</h4>
+                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                        {statsData.distribution && statsData.distribution.length ? statsData.distribution.map((d: any, i: number) => {
+                            const pct = d.percentage || Math.round((d.count / (records.length || 1)) * 100);
+                            const colors = ['#FFB085','#8EC5FF','#FF9CCF','#FFD580','#C7F9CC','#D3C2FF'];
+                            return (
+                                <div key={i} style={{display:'flex', alignItems:'center', gap:8}}>
+                                    <div style={{width:100, fontSize:13, color:'var(--text-main)', fontWeight:700}}>{d.type}</div>
+                                    <div style={{flex:1, height:12, background:'var(--border-color)', borderRadius:6, overflow:'hidden'}}>
+                                        <div style={{width: `${pct}%`, height:'100%', background: colors[i % colors.length]}}></div>
+                                    </div>
+                                    <div style={{width:50, textAlign:'right', fontSize:13, color:'var(--text-soft)'}}>{pct}%</div>
+                                </div>
+                            );
+                        }) : <div style={{color:'var(--text-soft)'}}>暂无分布数据</div>}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
