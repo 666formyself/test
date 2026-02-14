@@ -50,7 +50,13 @@ export default function DottedGlowBackground({
       el.height = Math.max(1, Math.floor(height * dpr));
       el.style.width = `${width}px`;
       el.style.height = `${height}px`;
-      ctx.scale(dpr, dpr);
+      // Reset transform then set scale according to devicePixelRatio to avoid cumulative scaling
+      if (typeof ctx.setTransform === 'function') {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      } else {
+        ctx.resetTransform && ctx.resetTransform();
+        ctx.scale(dpr, dpr);
+      }
     };
 
     const ro = new ResizeObserver(resize);

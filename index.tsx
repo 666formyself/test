@@ -255,15 +255,16 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
     );
 };
 
-const SplashScreen = ({ onFinish, t }: { onFinish: () => void, t: any }) => {
+const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => {
             setFadeOut(true);
+            try { onFadeStart && onFadeStart(); } catch (e) { }
             setTimeout(onFinish, 600);
         }, 2200);
         return () => clearTimeout(timer);
-    }, [onFinish]);
+    }, [onFinish, onFadeStart]);
 
     return (
         <div className={`splash-overlay ${fadeOut ? 'fade-up' : ''}`}>
@@ -323,6 +324,7 @@ const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, on
 
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
+    const [appReady, setAppReady] = useState(false);
     const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'anniversary'>('home');
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
     const [records, setRecords] = useState<CheckInRecord[]>([]);
@@ -511,7 +513,7 @@ function App() {
         reader.onloadend = async () => {
             const base64Data = (reader.result as string).split(',')[1];
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
                     contents: {
@@ -611,9 +613,9 @@ function App() {
 
     return (
         <>
-            {isAppLoading && <SplashScreen t={t} onFinish={() => setIsAppLoading(false)} />}
+            {isAppLoading && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
             {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
-            <div className={`app-container ${isAppLoading ? 'hidden' : 'fade-in-ready'}`}>
+            <div className={`app-container ${appReady ? 'fade-in-ready' : ''}`}>
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
                 )}
