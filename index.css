@@ -18,7 +18,9 @@
     --card-pink: #FFF0F4;
     --card-purple: #F3F1FF;
     
-    --safe-area-inset-bottom: env(safe-area-inset-bottom, 20px);
+    /* 适配 iOS 和 Android 全面屏安全区域 */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 20px);
 }
 
 body.dark {
@@ -68,7 +70,8 @@ button {
     max-width: 500px;
     margin: 0 auto;
     min-height: 100vh;
-    padding-bottom: calc(110px + var(--safe-area-inset-bottom));
+    padding-top: var(--safe-area-top);
+    padding-bottom: calc(110px + var(--safe-area-bottom));
     position: relative;
     overflow-x: hidden;
 }
@@ -81,6 +84,34 @@ button {
 .view {
     width: 100%;
     animation: fadeIn 0.3s ease-out;
+}
+
+/* 玻璃拟态适配 Safari */
+.bottom-nav {
+    position: fixed;
+    bottom: calc(16px + var(--safe-area-bottom));
+    left: 16px;
+    right: 16px;
+    max-width: 468px;
+    margin: 0 auto;
+    height: 72px;
+    background: var(--nav-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px); /* Safari 必须前缀 */
+    border-radius: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.4);
+    z-index: 1000;
+}
+
+/* 移动端滚动流畅性 */
+.footprint-card {
+    max-height: 400px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* 加载动画 */
@@ -611,45 +642,6 @@ body.dark .peach-range { background: #2C2C2E; }
     margin-bottom: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.03);
     flex-shrink: 0;
-}
-
-.bottom-nav {
-    position: fixed;
-    bottom: 16px;
-    left: 16px;
-    right: 16px;
-    max-width: 468px;
-    margin: 0 auto;
-    height: 72px;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-    border-radius: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    border: 1px solid rgba(255,255,255,0.4);
-    z-index: 1000;
-}
-body.dark .bottom-nav { background: rgba(28, 28, 35, 0.85); border-color: rgba(255,255,255,0.05); }
-
-.bottom-nav button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    color: #AAA;
-    flex: 1;
-}
-
-.bottom-nav button span {
-    font-size: 10px;
-    font-weight: 800;
-}
-
-.bottom-nav button.active {
-    color: var(--accent);
 }
 
 @keyframes fadeIn {

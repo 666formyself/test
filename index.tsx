@@ -19,7 +19,6 @@ interface ReminderSettings {
     shareNotify: boolean;
     messageCenterNotify: boolean;
     animIntensity: AnimIntensity;
-    // 新增：每日定点提醒
     fixedReminderEnabled: boolean;
     fixedReminderTime: string;
 }
@@ -68,7 +67,7 @@ const TRANSLATIONS = {
         general: '通用设置', language: '多语言设置', darkMode: '深色模式',
         followSystem: '跟随系统', manualControl: '手动开关',
         addToHome: '添加到手机主界面',
-        addToHomeGuideIOS: '请点击浏览器下方的“分享”按钮，然后选择“添加到主屏幕”✨',
+        addToHomeGuideIOS: '请点击浏览器下方的“分享”按钮，然后选择“添加到主屏幕”✨ (iOS用户需添加后才可接收通知)',
         addToHomeGuideQuark: '请点击底部“三”菜单按钮，在弹出的面板中选择“添加到桌面”图标 📍',
         addToHomeGuideDefault: '请在浏览器菜单中寻找“安装应用”或“添加到主屏幕”选项',
         storage: '存储与缓存', clearCache: '清除本地记录', storageUsage: '已保存记录',
@@ -93,7 +92,7 @@ const TRANSLATIONS = {
             body: '小主，别忘了记录今天的精彩瞬间哦！✨',
             dailyTitle: '每日定点提醒',
             dailyBody: '到点啦，快来看看今天有哪些值得记录的事吧 🍵',
-            permissionDenied: '通知权限已被拒绝，请在系统设置中开启。'
+            permissionDenied: '通知权限已被拒绝或当前浏览器不支持。iOS用户需“添加到主屏幕”后再开启。'
         },
         reminder: {
             title: '提醒设置', checkIn: '打卡提醒', auxiliary: '辅助提醒', count: '提醒次数',
@@ -134,8 +133,8 @@ const TRANSLATIONS = {
         general: 'General', language: 'Language', darkMode: 'Night Mode',
         followSystem: 'Follow System', manualControl: 'Manual Toggle',
         addToHome: 'Add to Home Screen',
-        addToHomeGuideIOS: 'Tap the "Share" button and select "Add to Home Screen" ✨',
-        addToHomeGuideQuark: 'Tap the "Menu" (three lines) button at the bottom and select "Add to Desktop" 📍',
+        addToHomeGuideIOS: 'Tap "Share" and "Add to Home Screen" ✨ (Required for notifications on iOS)',
+        addToHomeGuideQuark: 'Tap the "Menu" button and select "Add to Desktop" 📍',
         addToHomeGuideDefault: 'Look for "Install App" or "Add to Home Screen" in your browser menu.',
         storage: 'Storage & Cache', clearCache: 'Clear Cache', storageUsage: 'Saved',
         confirmClear: 'Clear all records? This cannot be undone.',
@@ -159,7 +158,7 @@ const TRANSLATIONS = {
             body: 'Don\'t forget to record your wonderful moments today! ✨',
             dailyTitle: 'Daily Reminder',
             dailyBody: 'It\'s time! Let\'s record the highlights of your day 🍵',
-            permissionDenied: 'Permission denied. Please enable it in system settings.'
+            permissionDenied: 'Notifications not supported or denied. iOS users must use "Add to Home Screen".'
         },
         reminder: {
             title: 'Reminders', checkIn: 'Check-in Alert', auxiliary: 'Auxiliary Alert', count: 'Alert Count',
@@ -188,6 +187,23 @@ const TRANSLATIONS = {
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
             habits: 'Habits', mind: 'Mindfulness', housework: 'Work'
+        }
+    }
+};
+
+// --- 安全 API 调用工具函数 ---
+const safeVibrate = (pattern: number[]) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) { /* silent fail on unsupported devices */ }
+    }
+};
+
+const triggerNotification = (title: string, body: string) => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+            new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' });
+        } catch (e) {
+            // 在某些 PWA 环境下可能报错，可在此添加备用 ServiceWorker 逻辑
         }
     }
 };
@@ -265,7 +281,7 @@ function App() {
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
-    const lastFixedNotifDay = useRef<string | null>(null); // 记录上次发送定点提醒的日期
+    const lastFixedNotifDay = useRef<string | null>(null);
 
     const getDynamicGreeting = () => {
         const hour = new Date().getHours();
@@ -277,10 +293,10 @@ function App() {
         return t.greetings.night;
     };
 
-    // --- 通知调度引擎 ---
+    // --- 通知引擎 ---
     useEffect(() => {
         const checkReminders = () => {
-            if (Notification.permission !== 'granted') return;
+            if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
             const now = new Date();
             const hour = now.getHours();
@@ -288,21 +304,15 @@ function App() {
             const timeStr = `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
             const todayKey = now.toDateString();
 
-            // 1. 每日定点提醒判断
             if (settings.reminders.fixedReminderEnabled) {
                 if (timeStr === settings.reminders.fixedReminderTime && lastFixedNotifDay.current !== todayKey) {
-                    new Notification(t.notif.dailyTitle, {
-                        body: t.notif.dailyBody,
-                        icon: '/favicon.ico'
-                    });
+                    triggerNotification(t.notif.dailyTitle, t.notif.dailyBody);
                     lastFixedNotifDay.current = todayKey;
-                    if (settings.vibration && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    if (settings.vibration) safeVibrate([200, 100, 200]);
                 }
             }
 
-            // 2. 周期性打卡提醒判断
             if (settings.reminders.checkInEnabled) {
-                // 免打扰时段判断
                 const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
                     ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
                     : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
@@ -313,16 +323,13 @@ function App() {
                 const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === todayTimestamp);
 
                 if (!hasTodayCheckin && min === 0) {
-                    new Notification(t.notif.title, {
-                        body: t.notif.body,
-                        icon: '/favicon.ico'
-                    });
-                    if (settings.vibration && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    triggerNotification(t.notif.title, t.notif.body);
+                    if (settings.vibration) safeVibrate([200, 100, 200]);
                 }
             }
         };
 
-        const interval = setInterval(checkReminders, 60000); // 每分钟检查一次
+        const interval = setInterval(checkReminders, 60000);
         return () => clearInterval(interval);
     }, [settings.reminders, records, t, settings.vibration]);
 
@@ -340,7 +347,6 @@ function App() {
         if (savedAnniv) setAnniversaries(JSON.parse(savedAnniv));
         if (savedSettings) {
             const parsed = JSON.parse(savedSettings);
-            // 深度合并设置，处理新增字段
             setSettings(prev => ({ 
                 ...prev, 
                 ...parsed, 
@@ -576,8 +582,11 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
         }
     };
 
-    // 申请通知权限逻辑（通用）
     const requestNotificationPermission = async () => {
+        if (typeof Notification === 'undefined') {
+            alert(t.notif.permissionDenied);
+            return false;
+        }
         if (Notification.permission !== 'granted') {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
@@ -647,12 +656,11 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             <section className="settings-section">
                 <h4 className="category-title">{t.reminder.title}</h4>
                 <div className="settings-card">
-                    {/* 打卡状态提醒 */}
                     <div className="setting-item">
                         <div style={{display:'flex', flexDirection:'column'}}>
                             <span>{t.reminder.checkIn}</span>
-                            <small style={{fontSize:'10px', color: Notification.permission === 'granted' ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>
-                                {Notification.permission === 'granted' ? t.reminder.granted : t.reminder.authNeeded}
+                            <small style={{fontSize:'10px', color: (typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>
+                                {(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}
                             </small>
                         </div>
                         <label className="cream-switch">
@@ -661,7 +669,6 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                         </label>
                     </div>
 
-                    {/* 定点提醒设置 */}
                     <div className="setting-item">
                         <span>{t.reminder.fixedReminder}</span>
                         <label className="cream-switch">
@@ -721,7 +728,7 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
 
             {guideType && (
                 <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent:'center', padding: '24px' }}>
-                    <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', animation: 'slideInUp 0.4s cubic-bezier(0, 0, 0.2, 1)' }}>
+                    <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', background: 'white' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>
                             {guideType === 'ios' ? '📱' : guideType === 'quark' ? '🧭' : '✨'}
                         </div>
@@ -731,19 +738,6 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             {guideType === 'quark' && t.addToHomeGuideQuark}
                             {guideType === 'default' && t.addToHomeGuideDefault}
                         </p>
-                        {guideType === 'quark' && (
-                            <div style={{ background: '#F4F4F7', borderRadius: '20px', padding: '16px', marginBottom: '24px', display: 'flex', justifyContent: 'center', gap: '20px', opacity: 0.8 }}>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>三</div>
-                                    <span style={{ fontSize: '10px', fontWeight: '800' }}>底部菜单</span>
-                                </div>
-                                <div style={{ alignSelf: 'center', fontSize: '18px' }}>➜</div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems:'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>🏠</div>
-                                    <span style={{ fontSize: '10px', fontWeight: '800' }}>添加到桌面</span>
-                                </div>
-                            </div>
-                        )}
                         <button onClick={() => setGuideType(null)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
                     </div>
                 </div>
