@@ -1,5 +1,4 @@
 
-import { GoogleGenAI } from '@google/genai';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -254,6 +253,55 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
         </div>
     );
 };
+
+// Doubao API config (read from injected env)
+const DOUBAO_API_KEY = (typeof process !== 'undefined' && (process.env as any).DOUBAO_API_KEY) || '';
+
+async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, prompt: string) {
+    try {
+        const payload = {
+            model: 'doubao-seed-1-8-251228',
+            inputs: [
+                { type: 'image', data: base64Data, mime: mimeType },
+                { type: 'text', text: prompt }
+            ]
+        };
+
+        const resp = await fetch('https://api.doubao.com/v1/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${DOUBAO_API_KEY}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            const txt = await resp.text();
+            throw new Error(`Doubao API error: ${resp.status} ${txt}`);
+        }
+
+        const data = await resp.json();
+        // Flexible parsing for various possible Doubao response shapes
+        // Examples handled: { text }, { output }, { result: { text } }, { outputs: [{ content }] }, choices[], data[]
+        if (!data) return '';
+        if (typeof data === 'string') return data;
+        if (data.text) return data.text;
+        if (data.output) return data.output;
+        if (data.result && data.result.text) return data.result.text;
+        if (Array.isArray(data.outputs) && data.outputs[0]) {
+            const o = data.outputs[0];
+            return o.content || o.text || JSON.stringify(o);
+        }
+        if (Array.isArray(data.choices) && data.choices[0]) return data.choices[0].text || JSON.stringify(data.choices[0]);
+        if (Array.isArray(data.data) && data.data[0]) return data.data[0].text || data.data[0].output || JSON.stringify(data.data[0]);
+        if (data.response) return data.response;
+        return JSON.stringify(data);
+    } catch (err: any) {
+        console.error('callDoubaoImageAnalysis error', err);
+        throw err;
+    }
+}
 
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
@@ -513,17 +561,9 @@ function App() {
         reader.onloadend = async () => {
             const base64Data = (reader.result as string).split(',')[1];
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: {
-                        parts: [
-                            { inlineData: { data: base64Data, mimeType: file.type } },
-                            { text: settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English." }
-                        ]
-                    }
-                });
-                setCalorieResult(response.text || '');
+                const prompt = settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English.";
+                const responseText = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
+                setCalorieResult(responseText || '');
             } catch (err) {
                 setCalorieResult(settings.language === 'zh' ? '分析失败，请稍后重试' : 'Analysis failed, please try again later');
             } finally { setIsAnalyzing(false); }

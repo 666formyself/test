@@ -11,7 +11,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        // Inject Doubao API key; prefer env var, fallback to provided key
+        'process.env.DOUBAO_API_KEY': JSON.stringify(env.DOUBAO_API_KEY || '552e8f29-b293-409d-ad60-cefb365401a1')
       },
       resolve: {
         alias: {
