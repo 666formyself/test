@@ -71,12 +71,19 @@ const TRANSLATIONS = {
         storage: '存储与缓存', clearCache: '清除本地记录', storageUsage: '已保存记录',
         confirmClear: '确定要清除所有记录吗？此操作无法撤销。',
         langOptions: { zh: '中文简体', en: 'English' },
-        aiVision: 'AI 视觉分析', scanFood: '扫描食物',
+        aiVision: 'AI 视觉分析', scanFood: '扫描食物', rescan: '重新扫描',
         successMsg: '太棒啦✨', successSub: '坚持就是胜利💪',
         nextTime: '稍后再说', customTask: '自定义任务',
         distance: '运动距离', km: '公里', m: '米',
         count: '个数', sets: '组数', times: '次', groups: '组',
         wakeTime: '起床时间', min: '分钟',
+        greetings: {
+            earlyMorning: '清晨好，迎接第一缕阳光',
+            morning: '上午好，开启充满活力的一天',
+            afternoon: '下午好，记得适当休息一下',
+            evening: '傍晚好，感受落日余晖的温柔',
+            night: '夜深了，愿你有个好梦',
+        },
         reminder: {
             title: '提醒设置', checkIn: '打卡提醒', auxiliary: '辅助提醒', count: '提醒次数',
             interval: '提醒间隔', dnd: '免打扰时段', anim: '动画强度',
@@ -119,12 +126,19 @@ const TRANSLATIONS = {
         storage: 'Storage & Cache', clearCache: 'Clear Cache', storageUsage: 'Saved',
         confirmClear: 'Clear all records? This cannot be undone.',
         langOptions: { zh: 'Simplified Chinese', en: 'English' },
-        aiVision: 'AI Vision', scanFood: 'Scan Food',
+        aiVision: 'AI Vision', scanFood: 'Scan Food', rescan: 'Re-scan',
         successMsg: 'Awesome! ✨', successSub: 'Consistency is key 💪',
         nextTime: 'Later', customTask: 'Custom Task',
         distance: 'Distance', km: 'km', m: 'm',
         count: 'Count', sets: 'Sets', times: 'times', groups: 'sets',
         wakeTime: 'Wake-up Time', min: 'min',
+        greetings: {
+            earlyMorning: 'Rise and shine, good morning',
+            morning: 'Good morning, have a productive day',
+            afternoon: 'Good afternoon, keep it up',
+            evening: 'Good evening, time to unwind',
+            night: 'Night vibes, rest well tonight',
+        },
         reminder: {
             title: 'Reminders', checkIn: 'Check-in Alert', auxiliary: 'Auxiliary Alert', count: 'Alert Count',
             interval: 'Interval', dnd: 'DND Period', anim: 'Animation',
@@ -225,6 +239,15 @@ function App() {
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
 
+    const getDynamicGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 9) return t.greetings.earlyMorning;
+        if (hour >= 9 && hour < 12) return t.greetings.morning;
+        if (hour >= 12 && hour < 18) return t.greetings.afternoon;
+        if (hour >= 18 && hour < 22) return t.greetings.evening;
+        return t.greetings.night;
+    };
+
     useEffect(() => {
         const handleBeforeInstall = (e: any) => {
             e.preventDefault();
@@ -294,7 +317,12 @@ function App() {
         });
         const types: Record<ActivityType, number> = { cardio: 0, strength: 0, habit: 0, wakeup: 0, general: 0 };
         records.forEach(r => types[r.activityType]++);
-        const distribution = Object.entries(types).map(([key, value]) => ({ type: key as ActivityType, count: value })).filter(d => d.count > 0).sort((a, b) => b.count - a.count);
+        const total = records.length || 1;
+        const distribution = Object.entries(types).map(([key, value]) => ({ 
+            type: key as ActivityType, 
+            count: value,
+            percentage: Math.round((value / total) * 100)
+        })).filter(d => d.count > 0).sort((a, b) => b.count - a.count);
         return { todayCount, streak, weekly, distribution };
     }, [records, settings.language]);
 
@@ -320,7 +348,7 @@ function App() {
                     contents: {
                         parts: [
                             { inlineData: { data: base64Data, mimeType: file.type } },
-                            { text: settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. Please answer in English." }
+                            { text: settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English." }
                         ]
                     }
                 });
@@ -340,7 +368,7 @@ function App() {
                 <header className="user-header">
                     <div className="avatar">🥑</div>
                     <div className="info">
-                        <h2>{settings.language === 'zh' ? '你好，开启活力一天' : 'Hello, active day!'}</h2>
+                        <h2 style={{ transition: 'opacity 0.5s ease' }}>{getDynamicGreeting()}</h2>
                         <p>{t.personalAssistant} · {t.warmMoments}</p>
                     </div>
                     <button className="settings-btn" onClick={() => setView('settings')}>⚙️</button>
@@ -392,7 +420,44 @@ function App() {
             <main className="content-area">
                 {view === 'home' && renderHome()}
                 {view === 'checkin' && <CheckinSelection t={t} checkinSubTab={checkinSubTab} setCheckinSubTab={setCheckinSubTab} setSelectedItem={setSelectedItem} handleAddRecord={handleAddRecord} setView={setView} selectedItem={selectedItem} editName={editName} setEditName={setEditName} />}
-                {view === 'food' && (<div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>AI {t.calories}</h2></div><div className="detail-card" style={{textAlign:'center', background:'var(--card-bg)', padding:'40px', borderRadius:'32px', border:'1px solid var(--border-color)'}}>{isAnalyzing ? <div className="refresh-anim">Analyzing...</div> : calorieResult ? <div className="refresh-anim" style={{textAlign:'left', whiteSpace:'pre-wrap'}}>{calorieResult}</div> : (<label style={{cursor:'pointer'}}><input type="file" hidden onChange={handleImageUpload} /><div style={{fontSize:'64px', marginBottom:'20px'}}>📸</div><h3>{t.scanFood}</h3></label>)}</div></div>)}
+                {view === 'food' && (
+                    <div className="view">
+                        <div className="sub-header">
+                            <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
+                            <h2>AI {t.calories}</h2>
+                        </div>
+                        <div className="detail-card" style={{background:'var(--card-bg)', padding:'32px', borderRadius:'40px', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-soft)'}}>
+                            {isAnalyzing ? (
+                                <div style={{textAlign:'center', padding:'40px 0'}}>
+                                    <div className="loading-spinner" style={{width:'48px', height:'48px', border:'4px solid var(--accent-light)', borderTopColor:'var(--accent)', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto 20px'}}></div>
+                                    <p style={{fontWeight:'700', color:'var(--text-soft)'}}>分析中...</p>
+                                </div>
+                            ) : calorieResult ? (
+                                <div style={{animation:'fadeIn 0.5s ease'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px', paddingBottom:'16px', borderBottom:'2px dashed var(--accent-light)'}}>
+                                        <div style={{fontSize:'32px'}}>🥗</div>
+                                        <h3 style={{margin:0, fontSize:'20px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
+                                    </div>
+                                    <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>{calorieResult}</div>
+                                    <button 
+                                        onClick={() => setCalorieResult(null)} 
+                                        className="btn-confirm highlight" 
+                                        style={{marginTop:'32px', width:'100%', height:'56px'}}
+                                    >
+                                        🔄 {t.rescan}
+                                    </button>
+                                </div>
+                            ) : (
+                                <label style={{cursor:'pointer', display:'block', textAlign:'center', padding:'40px 0'}}>
+                                    <input type="file" hidden onChange={handleImageUpload} />
+                                    <div style={{width:'100px', height:'100px', background:'var(--card-orange)', borderRadius:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', margin:'0 auto 24px', boxShadow:'0 8px 20px rgba(255,150,113,0.1)'}}>📸</div>
+                                    <h3 style={{fontSize:'20px', fontWeight:'850', color:'var(--text-main)'}}>{t.scanFood}</h3>
+                                    <p style={{color:'var(--text-soft)', marginTop:'8px', fontWeight:'700', fontSize:'13px'}}>拍照即刻获知热量建议</p>
+                                </label>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                 {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
                 {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
@@ -532,7 +597,7 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             </section>
 
             {guideType && (
-                <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent:'center', padding: '24px' }}>
                     <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', animation: 'slideInUp 0.4s cubic-bezier(0, 0, 0.2, 1)' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>
                             {guideType === 'ios' ? '📱' : guideType === 'quark' ? '🧭' : '✨'}
@@ -551,7 +616,7 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                                 </div>
                                 <div style={{ alignSelf: 'center', fontSize: '18px' }}>➜</div>
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>🏠</div>
+                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems:'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>🏠</div>
                                     <span style={{ fontSize: '10px', fontWeight: '800' }}>添加到桌面</span>
                                 </div>
                             </div>
@@ -671,7 +736,8 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
                             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', fontSize:'16px', fontWeight:'700'}} />
                             
                             <div className="preset-chips" style={{justifyContent:'center'}}>
-                                {(Object.keys(t.anniv.cats) as Array<keyof typeof t.anniv.cats>).map(cat => (
+                                {/* Use a more specific type cast to avoid 'string | number | symbol' errors for React Key and state setter */}
+                                {(Object.keys(t.anniv.cats) as Array<'love' | 'birthday' | 'life' | 'goal'>).map(cat => (
                                     <button key={cat} onClick={() => setNewCat(cat)} className={newCat === cat ? 'active' : ''}>{t.anniv.cats[cat]}</button>
                                 ))}
                             </div>
@@ -900,9 +966,29 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
 function StatsView({ t, statsData, setView, records }: any) {
     if (!statsData) return <div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div><div className="empty-state" style={{marginTop:'100px'}}><p>{t.noRecords}</p></div></div>;
     const maxWeekly = Math.max(...statsData.weekly.map((w:any) => w.count), 1);
+    const getIcon = (type: ActivityType) => {
+        switch(type) {
+            case 'cardio': return '🏃';
+            case 'strength': return '🏋️';
+            case 'habit': return '💧';
+            case 'wakeup': return '🌅';
+            default: return '📝';
+        }
+    };
+    const getLabel = (type: ActivityType) => {
+        switch(type) {
+            case 'cardio': return t.categories.cardio;
+            case 'strength': return t.categories.strength;
+            case 'habit': return t.categories.habits;
+            case 'wakeup': return '早起';
+            default: return '日常';
+        }
+    };
+
     return (
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
+            
             <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', marginBottom:'24px'}}>
                 <div className="nav-card" style={{background:'var(--card-orange)', padding:'16px'}}>
                     <span style={{fontSize:'12px', fontWeight:'800', opacity:0.6}}>{t.statLabels.streak}</span>
@@ -917,13 +1003,34 @@ function StatsView({ t, statsData, setView, records }: any) {
                     <span style={{fontSize:'24px', fontWeight:'900'}}>{records.length}</span>
                 </div>
             </div>
-            <div style={{background:'white', borderRadius:'32px', padding:'24px', boxShadow:'var(--shadow-soft)'}}>
+
+            <div style={{background:'white', borderRadius:'32px', padding:'24px', boxShadow:'var(--shadow-soft)', marginBottom:'24px'}}>
                 <h4 style={{margin:'0 0 20px', fontSize:'16px', fontWeight:'850'}}>{t.statLabels.weekly}</h4>
                 <div style={{height:'120px', display:'flex', alignItems:'flex-end', justifyContent:'space-around'}}>
                     {statsData.weekly.map((w:any, i:number) => (
                         <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px'}}>
-                            <div style={{width:'10px', height:`${(w.count / maxWeekly) * 100}%`, background:'var(--accent-gradient)', borderRadius:'5px', minHeight:'6px', transition:'height 0.8s ease-out'}}></div>
+                            <div style={{width:'10px', height:`${(w.count / maxWeekly) * 100}%`, background: i === 6 ? 'var(--accent-gradient)' : '#F2F2F7', borderRadius:'5px', minHeight:'6px', transition:'height 0.8s ease-out'}}></div>
                             <span style={{fontSize:'10px', fontWeight:'800', color: i===6 ? 'var(--accent)' : 'var(--text-soft)'}}>{w.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div style={{background:'white', borderRadius:'32px', padding:'24px', boxShadow:'var(--shadow-soft)'}}>
+                <h4 style={{margin:'0 0 20px', fontSize:'16px', fontWeight:'850'}}>{t.statLabels.distribution}</h4>
+                <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+                    {statsData.distribution.map((d:any) => (
+                        <div key={d.type} style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                            <div style={{width:'36px', height:'36px', background:'#F9F9F9', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px'}}>{getIcon(d.type)}</div>
+                            <div style={{flex:1}}>
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                    <span style={{fontSize:'13px', fontWeight:'800'}}>{getLabel(d.type)}</span>
+                                    <span style={{fontSize:'13px', fontWeight:'800', color:'var(--text-soft)'}}>{d.percentage}%</span>
+                                </div>
+                                <div style={{height:'6px', background:'#F2F2F7', borderRadius:'3px', overflow:'hidden'}}>
+                                    <div style={{width:`${d.percentage}%`, height:'100%', background:'var(--accent-gradient)'}}></div>
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>

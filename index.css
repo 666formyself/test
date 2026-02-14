@@ -83,6 +83,11 @@ button {
     animation: fadeIn 0.3s ease-out;
 }
 
+/* 加载动画 */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* 设置界面样式 */
 .settings-section {
     margin-bottom: 32px;
