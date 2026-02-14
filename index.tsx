@@ -507,10 +507,9 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
     useEffect(() => {
         const now = new Date();
         const isFeb14 = now.getMonth() === 1 && now.getDate() === 14;
-        const hasSeenToday = sessionStorage.getItem('seen_valentine_today');
-        if (isFeb14 && !hasSeenToday) {
+        // 修改点：移除 sessionStorage 检查，使得每次打开纪念日界面都能看到祝福弹窗
+        if (isFeb14) {
             setShowValentine(true);
-            sessionStorage.setItem('seen_valentine_today', 'true');
         }
     }, []);
 
