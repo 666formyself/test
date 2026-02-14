@@ -18,12 +18,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Ark/Volces endpoint expects image_url; upload base64 to a temporary host first.
     const endpoint = process.env.DOUBAO_API_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/responses';
 
-    // Helper: upload binary to transfer.sh (simple anonymous file host) via PUT
-    async function uploadToTransfer(filename: string, buffer: Buffer, mime: string) {
-      const uploadUrl = `https://transfer.sh/${filename}`;
-      const r = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': mime }, body: buffer });
-      if (!r.ok) throw new Error(`upload failed: ${r.status} ${await r.text()}`);
-      return (await r.text()).trim();
+    // Helper: upload binary to transfer.sh (anonymous) via PUT; if fails, fallback to 0x0.st via multipart POST
+    async function uploadToTransferOr0x0(filename: string, buffer: Buffer, mime: string) {
+      const errors: string[] = [];
+
+      // Attempt transfer.sh first
+      try {
+        const uploadUrl = `https://transfer.sh/${filename}`;
+        const r = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': mime }, body: buffer });
+        if (r.ok) return (await r.text()).trim();
+        const txt = await r.text();
+        errors.push(`transfer.sh: ${r.status} ${txt}`);
+      } catch (e: any) {
+        errors.push(`transfer.sh: ${e?.message || String(e)}`);
+      }
+
+      // Fallback: 0x0.st (multipart form)
+      try {
+        // Build FormData using Web API (Node 18+ supports Blob/FormData)
+        const form = new FormData();
+        // create Blob from buffer
+        const blob = new Blob([buffer], { type: mime });
+        // @ts-ignore append supports (name, blob, filename)
+        form.append('file', blob, filename);
+
+        const r2 = await fetch('https://0x0.st', { method: 'POST', body: form });
+        if (r2.ok) return (await r2.text()).trim();
+        const txt2 = await r2.text();
+        errors.push(`0x0.st: ${r2.status} ${txt2}`);
+      } catch (e: any) {
+        errors.push(`0x0.st: ${e?.message || String(e)}`);
+      }
+
+      throw new Error(errors.join(' | '));
     }
 
     // convert base64 to buffer
@@ -33,8 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let imageUrl: string;
     try {
-      imageUrl = await uploadToTransfer(filename, imgBuffer, mimeType || 'application/octet-stream');
+      imageUrl = await uploadToTransferOr0x0(filename, imgBuffer, mimeType || 'application/octet-stream');
     } catch (e: any) {
+      console.error('image upload errors:', e);
       return res.status(502).json({ error: `Image upload failed: ${e?.message || String(e)}` });
     }
 
