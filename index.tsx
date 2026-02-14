@@ -280,29 +280,48 @@ function parseDoubaoResult(res: any): string {
     // If provider returned wrapper { result: {...} }
     if (res.result) return parseDoubaoResult(res.result);
 
-    // Common: `output` is an array with items that may contain `content` or `summary`
+    // Common: `output` is an array with items that may contain `content` or `summary`.
+    // Collect candidate text fragments, then dedupe and remove fragments
+    // that are identical or wholly contained within another fragment.
     if (Array.isArray(res.output) && res.output.length > 0) {
         const parts: string[] = [];
+        const push = (val: any) => {
+            if (!val) return;
+            if (typeof val === 'string') parts.push(val.trim());
+            else if (val.text) parts.push(String(val.text).trim());
+        };
+
         for (const out of res.output) {
             if (out.summary && Array.isArray(out.summary)) {
-                for (const s of out.summary) {
-                    if (s && s.type === 'summary_text' && s.text) parts.push(s.text);
-                }
+                for (const s of out.summary) push(s && (s.text || s));
             }
             if (out.content && Array.isArray(out.content)) {
                 for (const c of out.content) {
                     if (!c) continue;
-                    if (c.type === 'output_text' && c.text) parts.push(c.text);
-                    // some responses nest a message object
-                    if (c.type === 'message' && Array.isArray(c.content)) {
-                        for (const cc of c.content) {
-                            if (cc.type === 'output_text' && cc.text) parts.push(cc.text);
-                        }
-                    }
+                    if (typeof c === 'string') push(c);
+                    else if (c.type === 'output_text' && c.text) push(c.text);
+                    else if (c.type === 'message' && Array.isArray(c.content)) {
+                        for (const cc of c.content) if (cc && cc.type === 'output_text' && cc.text) push(cc.text);
+                    } else if (c.text) push(c.text);
                 }
             }
+            if (out.text) push(out.text);
         }
-        if (parts.length) return parts.join('\n\n');
+
+        // Normalize and dedupe by exact match or containment
+        const normalized = parts.map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+        const unique: string[] = [];
+        for (const p of normalized) {
+            let skipped = false;
+            for (let i = 0; i < unique.length; i++) {
+                const u = unique[i];
+                if (u === p) { skipped = true; break; }
+                if (u.includes(p)) { skipped = true; break; }
+                if (p.includes(u)) { unique[i] = p; skipped = true; break; }
+            }
+            if (!skipped) unique.push(p);
+        }
+        if (unique.length) return unique.join('\n\n');
     }
 
     // Older shapes: `output` may be string, or `outputs`/`choices` arrays
@@ -338,17 +357,28 @@ function makeShortSummary(text: string | null, maxChars = 180, maxLines = 4) {
 
 function cleanDoubaoText(text: string | null, maxFullChars = 600) {
     if (!text) return '';
-    // remove very likely instruction/meta lines and empty lines, dedupe paragraphs
-    const paras = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    const seen = new Set<string>();
+    // remove likely instruction/meta lines and empty lines, dedupe paragraphs
+    const paras = text.split(/\n{1,}\s*\n{1,}|\r\n{2,}/).map(p => p.trim()).filter(Boolean);
     const out: string[] = [];
     for (const p of paras) {
         // drop lines that look like instructions, checks, or chain-of-thought markers
         if (/^(现在|请|注意|检查|整理|输出要求|只输出|Only return|Do not|Don't|Please|Now|Note)[:，,\s]/i.test(p)) continue;
         if (/(现在整理|现在输出|现在检查|按照要求|输出要求|思考过程|过程|步骤|原因|解释|说明|提示|字数|检查字数|整理一下|现在|我将)/i.test(p)) continue;
         const norm = p.replace(/\s+/g, ' ').trim();
-        if (seen.has(norm)) continue;
-        seen.add(norm);
+        // if this paragraph is contained in an already-kept paragraph, skip it
+        let isContained = false;
+        for (let i = 0; i < out.length; i++) {
+            const existingNorm = out[i].replace(/\s+/g, ' ').trim();
+            if (existingNorm === norm) { isContained = true; break; }
+            if (existingNorm.includes(norm)) { isContained = true; break; }
+            if (norm.includes(existingNorm)) {
+                // replace with the longer paragraph
+                out[i] = p;
+                isContained = true;
+                break;
+            }
+        }
+        if (isContained) continue;
         out.push(p);
     }
     let result = out.join('\n\n');
