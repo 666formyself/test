@@ -15,22 +15,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Ark/Volces style endpoint (example from provider docs)
+    // Ark/Volces endpoint expects image_url; upload base64 to a temporary host first.
+    const endpoint = process.env.DOUBAO_API_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/responses';
+
+    // Helper: upload binary to transfer.sh (simple anonymous file host) via PUT
+    async function uploadToTransfer(filename: string, buffer: Buffer, mime: string) {
+      const uploadUrl = `https://transfer.sh/${filename}`;
+      const r = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': mime }, body: buffer });
+      if (!r.ok) throw new Error(`upload failed: ${r.status} ${await r.text()}`);
+      return (await r.text()).trim();
+    }
+
+    // convert base64 to buffer
+    const imgBuffer = Buffer.from(base64Data, 'base64');
+    const ext = mimeType && mimeType.split('/')[1] ? mimeType.split('/')[1].split('+')[0] : 'png';
+    const filename = `upload-${Date.now()}.${ext}`;
+
+    let imageUrl: string;
+    try {
+      imageUrl = await uploadToTransfer(filename, imgBuffer, mimeType || 'application/octet-stream');
+    } catch (e: any) {
+      return res.status(502).json({ error: `Image upload failed: ${e?.message || String(e)}` });
+    }
+
     const payload = {
       model: model || 'doubao-seed-1-8-251228',
       input: [
         {
           role: 'user',
           content: [
-            // Try sending base64 inline; provider examples often show image_url but some endpoints accept base64 fields.
-            { type: 'input_image', image_base64: base64Data, mime: mimeType },
+            { type: 'input_image', image_url: imageUrl },
             { type: 'input_text', text: prompt }
           ]
         }
       ]
     };
-
-    const endpoint = process.env.DOUBAO_API_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/responses';
 
     const resp = await fetch(endpoint, {
       method: 'POST',
