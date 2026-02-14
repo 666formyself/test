@@ -80,14 +80,21 @@ const TRANSLATIONS = {
         greetings: {
             earlyMorning: '清晨好，迎接第一缕阳光',
             morning: '上午好，开启充满活力的一天',
-            afternoon: '下午好，记得适当休息一下',
+            noon: '中午好，忙碌之余记得按时吃午饭',
+            afternoon: '下午好，稍微小憩一下再出发吧',
             evening: '傍晚好，感受落日余晖的温柔',
             night: '夜深了，愿你有个好梦',
+        },
+        notif: {
+            title: '打卡提醒',
+            body: '小主，别忘了记录今天的精彩瞬间哦！✨',
+            permissionDenied: '通知权限已被拒绝，请在系统设置中开启。'
         },
         reminder: {
             title: '提醒设置', checkIn: '打卡提醒', auxiliary: '辅助提醒', count: '提醒次数',
             interval: '提醒间隔', dnd: '免打扰时段', anim: '动画强度',
-            authNeeded: '请授权通知权限，以使用提醒功能', goAuth: '去授权',
+            authNeeded: '权限未授权', goAuth: '去授权',
+            granted: '已授权',
             report: '统计报告', share: '分享成功', message: '消息中心',
             intensity: { strong: '强', medium: '中', weak: '弱', off: '关闭' }
         },
@@ -135,14 +142,21 @@ const TRANSLATIONS = {
         greetings: {
             earlyMorning: 'Rise and shine, good morning',
             morning: 'Good morning, have a productive day',
-            afternoon: 'Good afternoon, keep it up',
+            noon: 'Good noon, don\'t forget to have lunch',
+            afternoon: 'Good afternoon, take a nap and recharge',
             evening: 'Good evening, time to unwind',
             night: 'Night vibes, rest well tonight',
+        },
+        notif: {
+            title: 'Check-in Reminder',
+            body: 'Don\'t forget to record your wonderful moments today! ✨',
+            permissionDenied: 'Permission denied. Please enable it in system settings.'
         },
         reminder: {
             title: 'Reminders', checkIn: 'Check-in Alert', auxiliary: 'Auxiliary Alert', count: 'Alert Count',
             interval: 'Interval', dnd: 'DND Period', anim: 'Animation',
-            authNeeded: 'Please grant notification permission', goAuth: 'Grant',
+            authNeeded: 'Unauthorized', goAuth: 'Grant',
+            granted: 'Authorized',
             report: 'Report Notify', share: 'Share Notify', message: 'Message Center',
             intensity: { strong: 'High', medium: 'Med', weak: 'Weak', off: 'Off' }
         },
@@ -218,7 +232,7 @@ function App() {
         inAppPopups: true,
         vibration: true,
         reminders: {
-            checkInEnabled: true,
+            checkInEnabled: false,
             reminderCount: 1,
             interval: 10,
             dndStart: '23:00',
@@ -243,10 +257,48 @@ function App() {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 9) return t.greetings.earlyMorning;
         if (hour >= 9 && hour < 12) return t.greetings.morning;
-        if (hour >= 12 && hour < 18) return t.greetings.afternoon;
+        if (hour >= 12 && hour < 14) return t.greetings.noon;
+        if (hour >= 14 && hour < 18) return t.greetings.afternoon;
         if (hour >= 18 && hour < 22) return t.greetings.evening;
         return t.greetings.night;
     };
+
+    // --- 通知调度引擎 ---
+    useEffect(() => {
+        const checkReminders = () => {
+            if (!settings.reminders.checkInEnabled) return;
+            if (Notification.permission !== 'granted') return;
+
+            const now = new Date();
+            const hour = now.getHours();
+            const min = now.getMinutes();
+            const timeStr = `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
+
+            // 免打扰时段判断
+            const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
+                ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
+                : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
+            
+            if (isDND) return;
+
+            // 如果今天还没有打卡记录，且当前是提醒的“时刻”（示例：每小时的 0 分触发，可根据 interval 更精细化）
+            const today = new Date().setHours(0,0,0,0);
+            const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === today);
+
+            if (!hasTodayCheckin && min === 0) {
+                new Notification(t.notif.title, {
+                    body: t.notif.body,
+                    icon: '/favicon.ico'
+                });
+                if (settings.vibration && navigator.vibrate) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+            }
+        };
+
+        const interval = setInterval(checkReminders, 60000); // 每分钟检查一次
+        return () => clearInterval(interval);
+    }, [settings.reminders, records, t, settings.vibration]);
 
     useEffect(() => {
         const handleBeforeInstall = (e: any) => {
@@ -493,6 +545,21 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
         }
     };
 
+    // 申请通知权限逻辑
+    const handleToggleReminder = async (checked: boolean) => {
+        if (checked) {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                updateReminders({ checkInEnabled: true });
+            } else {
+                alert(t.notif.permissionDenied);
+                updateReminders({ checkInEnabled: false });
+            }
+        } else {
+            updateReminders({ checkInEnabled: false });
+        }
+    };
+
     return (
         <div className="view">
             <div className="sub-header">
@@ -537,9 +604,14 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                 <h4 className="category-title">{t.reminder.title}</h4>
                 <div className="settings-card">
                     <div className="setting-item">
-                        <span>{t.reminder.checkIn}</span>
+                        <div style={{display:'flex', flexDirection:'column'}}>
+                            <span>{t.reminder.checkIn}</span>
+                            <small style={{fontSize:'10px', color: Notification.permission === 'granted' ? '#4CD964' : '#FF3B30', fontWeight:'800'}}>
+                                {Notification.permission === 'granted' ? t.reminder.granted : t.reminder.authNeeded}
+                            </small>
+                        </div>
                         <label className="cream-switch">
-                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} />
+                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => handleToggleReminder(e.target.checked)} />
                             <span className="slider"></span>
                         </label>
                     </div>
@@ -736,7 +808,6 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
                             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{width:'100%', height:'56px', borderRadius:'20px', background:'#F4F4F7', border:'none', padding:'0 20px', fontSize:'16px', fontWeight:'700'}} />
                             
                             <div className="preset-chips" style={{justifyContent:'center'}}>
-                                {/* Use a more specific type cast to avoid 'string | number | symbol' errors for React Key and state setter */}
                                 {(Object.keys(t.anniv.cats) as Array<'love' | 'birthday' | 'life' | 'goal'>).map(cat => (
                                     <button key={cat} onClick={() => setNewCat(cat)} className={newCat === cat ? 'active' : ''}>{t.anniv.cats[cat]}</button>
                                 ))}
@@ -987,7 +1058,10 @@ function StatsView({ t, statsData, setView, records }: any) {
 
     return (
         <div className="view">
-            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
+            <div className="sub-header">
+                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
+                <h2>{t.stats}</h2>
+            </div>
             
             <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', marginBottom:'24px'}}>
                 <div className="nav-card" style={{background:'var(--card-orange)', padding:'16px'}}>
