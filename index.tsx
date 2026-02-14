@@ -324,6 +324,18 @@ function parseDoubaoResult(res: any): string {
     try { return JSON.stringify(res, null, 2); } catch (e) { return String(res); }
 }
 
+function makeShortSummary(text: string | null, maxChars = 300, maxLines = 6) {
+    if (!text) return '';
+    // prefer first paragraph
+    const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    let base = paragraphs.length ? paragraphs[0] : text;
+    // if contains numbered list, keep first few list items
+    const lines = base.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    const take = lines.slice(0, maxLines).join('\n');
+    const short = take.length <= maxChars ? take : take.slice(0, maxChars) + '…';
+    return short;
+}
+
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
     useEffect(() => {
@@ -706,22 +718,22 @@ function App() {
                                     </div>
                                 ) : calorieResult ? (
                                     <div style={{animation:'fadeIn 0.5s ease'}}>
-                                        <div style={{display:'flex', gap:'18px', alignItems:'flex-start', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
+                                        <div style={{display:'flex', gap:'18px', alignItems:'center', justifyContent:'center', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
                                             {uploadedDataUrl && (
-                                                <div style={{flex: '0 0 140px'}}>
-                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'140px', height:'140px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)'}} />
+                                                <div style={{flex: '0 0 140px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'140px', height:'140px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)', display:'block'}} />
                                                 </div>
                                             )}
                                             <div style={{flex: 1}}>
                                                 <h3 style={{margin:'0 0 8px', fontSize:'18px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
                                                 <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>
                                                     {(() => {
-                                                        const max = 600;
-                                                        if (showFullResult || calorieResult.length <= max) return calorieResult;
-                                                        return calorieResult.slice(0, max) + '…';
+                                                        const short = makeShortSummary(calorieResult, 280, 6);
+                                                        if (showFullResult) return calorieResult;
+                                                        return short || calorieResult || '';
                                                     })()}
                                                 </div>
-                                                {calorieResult.length > 600 && (
+                                                {calorieResult && calorieResult.length > 280 && (
                                                     <button onClick={() => setShowFullResult(s => !s)} className="link-btn" style={{marginTop:'12px'}}>{showFullResult ? '收起' : '展开全文'}</button>
                                                 )}
                                             </div>
