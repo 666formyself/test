@@ -324,7 +324,7 @@ function parseDoubaoResult(res: any): string {
     try { return JSON.stringify(res, null, 2); } catch (e) { return String(res); }
 }
 
-function makeShortSummary(text: string | null, maxChars = 300, maxLines = 6) {
+function makeShortSummary(text: string | null, maxChars = 180, maxLines = 4) {
     if (!text) return '';
     // prefer first paragraph
     const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
@@ -718,22 +718,25 @@ function App() {
                                     </div>
                                 ) : calorieResult ? (
                                     <div style={{animation:'fadeIn 0.5s ease'}}>
-                                        <div style={{display:'flex', gap:'18px', alignItems:'center', justifyContent:'center', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
+                                        <div style={{display:'flex', flexDirection:'column', gap:'12px', alignItems:'center', justifyContent:'center', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
                                             {uploadedDataUrl && (
-                                                <div style={{flex: '0 0 140px', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'140px', height:'140px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)', display:'block'}} />
+                                                <div style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'160px', height:'160px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)', display:'block'}} />
                                                 </div>
                                             )}
-                                            <div style={{flex: 1}}>
-                                                <h3 style={{margin:'0 0 8px', fontSize:'18px', fontWeight:'900', color:'var(--accent)'}}>{t.aiVision}</h3>
-                                                <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.8', color:'var(--text-main)', fontSize:'15px', fontWeight:'600'}}>
+                                            <div style={{width: '100%', maxWidth: '560px'}}>
+                                                <h3 style={{margin:'0 0 8px', fontSize:'18px', fontWeight:'900', color:'var(--accent)', textAlign:'left'}}>{t.aiVision}</h3>
+                                                <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.6', color:'var(--text-main)', fontSize:'14px', fontWeight:'600'}}>
                                                     {(() => {
-                                                        const short = makeShortSummary(calorieResult, 280, 6);
-                                                        if (showFullResult) return calorieResult;
+                                                        const short = makeShortSummary(calorieResult, 180, 4);
+                                                        if (showFullResult) {
+                                                            if (!calorieResult) return '';
+                                                            return calorieResult.length > 600 ? calorieResult.slice(0, 600) + '…' : calorieResult;
+                                                        }
                                                         return short || calorieResult || '';
                                                     })()}
                                                 </div>
-                                                {calorieResult && calorieResult.length > 280 && (
+                                                {calorieResult && calorieResult.length > 180 && (
                                                     <button onClick={() => setShowFullResult(s => !s)} className="link-btn" style={{marginTop:'12px'}}>{showFullResult ? '收起' : '展开全文'}</button>
                                                 )}
                                             </div>
