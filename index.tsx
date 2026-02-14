@@ -19,6 +19,9 @@ interface ReminderSettings {
     shareNotify: boolean;
     messageCenterNotify: boolean;
     animIntensity: AnimIntensity;
+    // 新增：每日定点提醒
+    fixedReminderEnabled: boolean;
+    fixedReminderTime: string;
 }
 
 interface AppSettings {
@@ -88,6 +91,8 @@ const TRANSLATIONS = {
         notif: {
             title: '打卡提醒',
             body: '小主，别忘了记录今天的精彩瞬间哦！✨',
+            dailyTitle: '每日定点提醒',
+            dailyBody: '到点啦，快来看看今天有哪些值得记录的事吧 🍵',
             permissionDenied: '通知权限已被拒绝，请在系统设置中开启。'
         },
         reminder: {
@@ -95,6 +100,8 @@ const TRANSLATIONS = {
             interval: '提醒间隔', dnd: '免打扰时段', anim: '动画强度',
             authNeeded: '权限未授权', goAuth: '去授权',
             granted: '已授权',
+            fixedReminder: '每日定点提醒',
+            fixedTime: '提醒时刻',
             report: '统计报告', share: '分享成功', message: '消息中心',
             intensity: { strong: '强', medium: '中', weak: '弱', off: '关闭' }
         },
@@ -150,6 +157,8 @@ const TRANSLATIONS = {
         notif: {
             title: 'Check-in Reminder',
             body: 'Don\'t forget to record your wonderful moments today! ✨',
+            dailyTitle: 'Daily Reminder',
+            dailyBody: 'It\'s time! Let\'s record the highlights of your day 🍵',
             permissionDenied: 'Permission denied. Please enable it in system settings.'
         },
         reminder: {
@@ -157,6 +166,8 @@ const TRANSLATIONS = {
             interval: 'Interval', dnd: 'DND Period', anim: 'Animation',
             authNeeded: 'Unauthorized', goAuth: 'Grant',
             granted: 'Authorized',
+            fixedReminder: 'Daily Fixed Reminder',
+            fixedTime: 'Reminder Time',
             report: 'Report Notify', share: 'Share Notify', message: 'Message Center',
             intensity: { strong: 'High', medium: 'Med', weak: 'Weak', off: 'Off' }
         },
@@ -241,7 +252,9 @@ function App() {
             reportNotify: true,
             shareNotify: true,
             messageCenterNotify: false,
-            animIntensity: 'medium'
+            animIntensity: 'medium',
+            fixedReminderEnabled: false,
+            fixedReminderTime: '17:00'
         }
     });
     
@@ -252,6 +265,7 @@ function App() {
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
+    const lastFixedNotifDay = useRef<string | null>(null); // 记录上次发送定点提醒的日期
 
     const getDynamicGreeting = () => {
         const hour = new Date().getHours();
@@ -266,32 +280,44 @@ function App() {
     // --- 通知调度引擎 ---
     useEffect(() => {
         const checkReminders = () => {
-            if (!settings.reminders.checkInEnabled) return;
             if (Notification.permission !== 'granted') return;
 
             const now = new Date();
             const hour = now.getHours();
             const min = now.getMinutes();
             const timeStr = `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
+            const todayKey = now.toDateString();
 
-            // 免打扰时段判断
-            const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
-                ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
-                : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
-            
-            if (isDND) return;
+            // 1. 每日定点提醒判断
+            if (settings.reminders.fixedReminderEnabled) {
+                if (timeStr === settings.reminders.fixedReminderTime && lastFixedNotifDay.current !== todayKey) {
+                    new Notification(t.notif.dailyTitle, {
+                        body: t.notif.dailyBody,
+                        icon: '/favicon.ico'
+                    });
+                    lastFixedNotifDay.current = todayKey;
+                    if (settings.vibration && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                }
+            }
 
-            // 如果今天还没有打卡记录，且当前是提醒的“时刻”（示例：每小时的 0 分触发，可根据 interval 更精细化）
-            const today = new Date().setHours(0,0,0,0);
-            const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === today);
+            // 2. 周期性打卡提醒判断
+            if (settings.reminders.checkInEnabled) {
+                // 免打扰时段判断
+                const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
+                    ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
+                    : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
+                
+                if (isDND) return;
 
-            if (!hasTodayCheckin && min === 0) {
-                new Notification(t.notif.title, {
-                    body: t.notif.body,
-                    icon: '/favicon.ico'
-                });
-                if (settings.vibration && navigator.vibrate) {
-                    navigator.vibrate([200, 100, 200]);
+                const todayTimestamp = new Date().setHours(0,0,0,0);
+                const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === todayTimestamp);
+
+                if (!hasTodayCheckin && min === 0) {
+                    new Notification(t.notif.title, {
+                        body: t.notif.body,
+                        icon: '/favicon.ico'
+                    });
+                    if (settings.vibration && navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 }
             }
         };
@@ -314,7 +340,12 @@ function App() {
         if (savedAnniv) setAnniversaries(JSON.parse(savedAnniv));
         if (savedSettings) {
             const parsed = JSON.parse(savedSettings);
-            setSettings(prev => ({ ...prev, ...parsed }));
+            // 深度合并设置，处理新增字段
+            setSettings(prev => ({ 
+                ...prev, 
+                ...parsed, 
+                reminders: { ...prev.reminders, ...parsed.reminders } 
+            }));
         }
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     }, []);
@@ -545,18 +576,31 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
         }
     };
 
-    // 申请通知权限逻辑
-    const handleToggleReminder = async (checked: boolean) => {
-        if (checked) {
+    // 申请通知权限逻辑（通用）
+    const requestNotificationPermission = async () => {
+        if (Notification.permission !== 'granted') {
             const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                updateReminders({ checkInEnabled: true });
-            } else {
+            if (permission !== 'granted') {
                 alert(t.notif.permissionDenied);
-                updateReminders({ checkInEnabled: false });
+                return false;
             }
+        }
+        return true;
+    };
+
+    const handleToggleCheckInReminder = async (checked: boolean) => {
+        if (checked) {
+            if (await requestNotificationPermission()) updateReminders({ checkInEnabled: true });
         } else {
             updateReminders({ checkInEnabled: false });
+        }
+    };
+
+    const handleToggleFixedReminder = async (checked: boolean) => {
+        if (checked) {
+            if (await requestNotificationPermission()) updateReminders({ fixedReminderEnabled: true });
+        } else {
+            updateReminders({ fixedReminderEnabled: false });
         }
     };
 
@@ -603,6 +647,7 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             <section className="settings-section">
                 <h4 className="category-title">{t.reminder.title}</h4>
                 <div className="settings-card">
+                    {/* 打卡状态提醒 */}
                     <div className="setting-item">
                         <div style={{display:'flex', flexDirection:'column'}}>
                             <span>{t.reminder.checkIn}</span>
@@ -611,22 +656,36 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             </small>
                         </div>
                         <label className="cream-switch">
-                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => handleToggleReminder(e.target.checked)} />
+                            <input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => handleToggleCheckInReminder(e.target.checked)} />
                             <span className="slider"></span>
                         </label>
                     </div>
+
+                    {/* 定点提醒设置 */}
                     <div className="setting-item">
-                        <span>{t.reminder.count}</span>
-                        <div className="segment-control small">
-                            {[1, 2, 3].map(v => (
-                                <button key={v} className={settings.reminders.reminderCount === v ? 'active' : ''} onClick={() => updateReminders({ reminderCount: v })}>{v}</button>
-                            ))}
-                        </div>
+                        <span>{t.reminder.fixedReminder}</span>
+                        <label className="cream-switch">
+                            <input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => handleToggleFixedReminder(e.target.checked)} />
+                            <span className="slider"></span>
+                        </label>
                     </div>
+                    {settings.reminders.fixedReminderEnabled && (
+                        <div className="setting-item">
+                            <span>{t.reminder.fixedTime}</span>
+                            <input 
+                                type="time" 
+                                className="time-input-simple" 
+                                style={{maxWidth:'100px'}} 
+                                value={settings.reminders.fixedReminderTime} 
+                                onChange={e => updateReminders({ fixedReminderTime: e.target.value })} 
+                            />
+                        </div>
+                    )}
+
                     <div className="setting-item">
                         <span>{t.reminder.interval} (min)</span>
                         <div className="segment-control small">
-                            {[5, 10, 30].map(v => (
+                            {[10, 30, 60].map(v => (
                                 <button key={v} className={settings.reminders.interval === v ? 'active' : ''} onClick={() => updateReminders({ interval: v })}>{v}</button>
                             ))}
                         </div>
@@ -637,14 +696,6 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             <input type="time" className="time-input-simple" value={settings.reminders.dndStart} onChange={e => updateReminders({ dndStart: e.target.value })} />
                             <span style={{ alignSelf: 'center', opacity: 0.3 }}>-</span>
                             <input type="time" className="time-input-simple" value={settings.reminders.dndEnd} onChange={e => updateReminders({ dndEnd: e.target.value })} />
-                        </div>
-                    </div>
-                    <div className="setting-item">
-                        <span>{t.reminder.anim}</span>
-                        <div className="segment-control">
-                            {(['strong', 'medium', 'weak', 'off'] as AnimIntensity[]).map(v => (
-                                <button key={v} className={settings.reminders.animIntensity === v ? 'active' : ''} onClick={() => updateReminders({ animIntensity: v })}>{t.reminder.intensity[v]}</button>
-                            ))}
                         </div>
                     </div>
                 </div>
