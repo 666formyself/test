@@ -336,6 +336,27 @@ function makeShortSummary(text: string | null, maxChars = 180, maxLines = 4) {
     return short;
 }
 
+function cleanDoubaoText(text: string | null, maxFullChars = 600) {
+    if (!text) return '';
+    // remove very likely instruction/meta lines and empty lines, dedupe paragraphs
+    const paras = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of paras) {
+        // drop lines that look like instructions or checks
+        if (/^(现在|请|注意|检查|整理|输出要求|只输出|Only return|Do not|Don't|Please|Now|Note)[:，,\s]/i.test(p)) continue;
+        const norm = p.replace(/\s+/g, ' ').trim();
+        if (seen.has(norm)) continue;
+        seen.add(norm);
+        out.push(p);
+    }
+    let result = out.join('\n\n');
+    // If still empty, fallback to original trimmed text
+    if (!result) result = text.trim();
+    if (result.length > maxFullChars) result = result.slice(0, maxFullChars) + '…';
+    return result;
+}
+
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
     useEffect(() => {
@@ -601,14 +622,12 @@ function App() {
             const base64Data = dataUrl.split(',')[1];
             try {
                 const prompt = settings.language === 'zh'
-                    ? `请简洁分析这张图片中的食物，并估算热量（卡路里）。输出要求：
-1）第一行用一句话总结结论（不超过30字）；
-2）随后列出不超过3条要点，每条不超过60字，包含热量估算与1-2条实用营养建议；
-3）全文不超过600字；
-只输出正文，不要输出额外的注释或解释。`
-                    : `Give a concise analysis of the food in this image and estimate calories. Requirements:\n1) One-line summary (<=30 words) on the first line;\n2) Then up to 3 bullet points, each <=60 words, including calorie estimate and 1-2 practical nutrition tips;\n3) Total output no more than 600 words;\nOnly return the content, no extra commentary.`;
+                    ? `请严格按照下面格式输出（只输出正文，不要有任何额外注释、提示或重复的说明）：\n
+1) 第一行：一句话结论（不超过30字）。\n2) 接着最多3条要点，每条不超过60字，包含热量估算与1-2条实用营养建议（每条开头用短破折号或数字）。\n3) 全文不要超过600字。\n\n只输出结果正文，禁止任何格式说明、字数检查或多余重复内容。`
+                    : `Strictly output only the requested content, no extra commentary, no repetition, no instructions:\n\n1) First line: one-line summary (<=30 words).\n2) Then up to 3 bullet points, each <=60 words, include calorie estimate and 1-2 practical nutrition tips.\n3) Total output must not exceed 600 words.\n\nOutput only the result body. Do NOT repeat the prompt, do NOT add any notes or checks.`;
                 const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
-                const textOutput = parseDoubaoResult(response) || '';
+                let textOutput = parseDoubaoResult(response) || '';
+                textOutput = cleanDoubaoText(textOutput, 600);
                 setCalorieResult(textOutput);
             } catch (err: any) {
                 const msg = err?.message || String(err);
