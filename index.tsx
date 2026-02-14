@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 
 // --- Types ---
-type ActivityType = 'cardio' | 'strength' | 'habit' | 'wakeup' | 'general';
+type ActivityType = 'cardio' | 'strength' | 'flexibility' | 'habit' | 'mind' | 'daily' | 'wakeup' | 'general' | 'rope';
 type DarkModeType = 'manual' | 'system';
 type AnimIntensity = 'strong' | 'medium' | 'weak' | 'off';
 
@@ -63,7 +63,7 @@ const TRANSLATIONS = {
         todaySteps: '今日足迹', noRecords: '今天还没留下小印记呢~',
         personalAssistant: '私人生活助理', warmMoments: '记录温暖的小日子',
         complete: '打卡完成', matterName: '事项名称', duration: '持续时长',
-        checkinDetails: '打卡细节', sportCheck: '运动打卡', eventCheck: '生活打卡',
+        checkinDetails: '打卡详情', sportCheck: '运动打卡', eventCheck: '生活打卡',
         general: '通用设置', language: '多语言设置', darkMode: '深色模式',
         followSystem: '跟随系统', manualControl: '手动开关',
         addToHome: '添加到手机主界面',
@@ -78,7 +78,7 @@ const TRANSLATIONS = {
         nextTime: '稍后再说', customTask: '自定义任务',
         distance: '运动距离', km: '公里', m: '米',
         count: '个数', sets: '组数', times: '次', groups: '组',
-        wakeTime: '起床时刻', min: '分钟',
+        wakeTime: '起床时刻', min: '分钟', notePlaceholder: '记录一下此刻的心情或身体感受...',
         greetings: {
             earlyMorning: '清晨好，迎接第一缕阳光',
             morning: '上午好，开启充满活力的一天',
@@ -123,7 +123,7 @@ const TRANSLATIONS = {
         },
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
-            habits: '自律习惯', mind: '精神寄托', housework: '日常事务'
+            habits: '自律习惯', mind: '精神寄托', daily: '日常事务', custom: '自定义'
         }
     },
     en: {
@@ -147,7 +147,7 @@ const TRANSLATIONS = {
         nextTime: 'Later', customTask: 'Custom Task',
         distance: 'Distance', km: 'km', m: 'm',
         count: 'Count', sets: 'Sets', times: 'times', groups: 'sets',
-        wakeTime: 'Wake-up Time', min: 'min',
+        wakeTime: 'Wake-up Time', min: 'min', notePlaceholder: 'Record how you feel or your physical state...',
         greetings: {
             earlyMorning: 'Rise and shine, good morning',
             morning: 'Good morning, have a productive day',
@@ -192,13 +192,14 @@ const TRANSLATIONS = {
         },
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
-            habits: 'Habits', mind: 'Mindfulness', housework: 'Work'
+            habits: 'Habits', mind: 'Mind', daily: 'Daily', custom: 'Custom'
         }
     }
 };
 
 // --- 安全 API 调用工具函数 ---
 const safeVibrate = (pattern: number[]) => {
+    if (pattern.length === 0) return;
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
         try { navigator.vibrate(pattern); } catch (e) { /* silent fail */ }
     }
@@ -240,11 +241,14 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
         return () => clearInterval(timer);
     }, []);
     return (
-        <div className="clock-section" style={{ textAlign: 'center', margin: '24px 0' }}>
-            <h1 style={{ fontSize: '52px', margin: 0, fontWeight: '900', color: 'var(--text-main)' }}>
-                {time.getHours().toString().padStart(2, '0')}:{time.getMinutes().toString().padStart(2, '0')}
-            </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-soft)', fontWeight: '700', margin: '4px 0 0' }}>
+        <div className="modern-clock-section">
+            <div className="time-display">
+                <span className="hour-min">
+                    {time.getHours().toString().padStart(2, '0')}:{time.getMinutes().toString().padStart(2, '0')}
+                </span>
+                <span className="seconds">{time.getSeconds().toString().padStart(2, '0')}</span>
+            </div>
+            <p className="date-display">
                 {time.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
         </div>
@@ -303,6 +307,20 @@ const FestivalPopup = ({ type, t, onClose }: { type: 'valentine' | 'newyear', t:
     );
 };
 
+// --- 新增辅助组件：步进器 ---
+const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, onChange: (v: number) => void, label: string, unit: string, step?: number }) => (
+    <div className="stepper-item">
+        <div className="stepper-label-group">
+            <span className="stepper-label">{label}</span>
+            <span className="stepper-value-display">{value}<small>{unit}</small></span>
+        </div>
+        <div className="stepper-controls">
+            <button onClick={() => onChange(Math.max(0, value - step))} className="stepper-btn">−</button>
+            <button onClick={() => onChange(value + step)} className="stepper-btn">+</button>
+        </div>
+    </div>
+);
+
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'anniversary'>('home');
@@ -359,9 +377,7 @@ function App() {
         const now = new Date();
         const m = now.getMonth() + 1;
         const d = now.getDate();
-        // 情人节 2.14
         if (m === 2 && d === 14) setActiveFestival('valentine');
-        // 元旦 1.1
         else if (m === 1 && d === 1) setActiveFestival('newyear');
     }, []);
 
@@ -467,7 +483,7 @@ function App() {
             }).length;
             return { label, count };
         });
-        const types: Record<ActivityType, number> = { cardio: 0, strength: 0, habit: 0, wakeup: 0, general: 0 };
+        const types: Record<ActivityType, number> = { cardio: 0, strength: 0, flexibility: 0, habit: 0, mind: 0, daily: 0, wakeup: 0, general: 0, rope: 0 };
         records.forEach(r => types[r.activityType]++);
         const total = records.length || 1;
         const distribution = Object.entries(types).map(([key, value]) => ({ 
@@ -483,6 +499,7 @@ function App() {
         setRecords([newRecord, ...records]);
         setShowSuccess(true);
         setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+        if (settings.vibration) safeVibrate([50]);
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -517,48 +534,76 @@ function App() {
         const todayRecords = records.filter(r => new Date(r.timestamp).setHours(0,0,0,0) === today);
         return (
             <div className="view">
-                <header className="user-header">
-                    <div className="avatar">🥑</div>
-                    <div className="info">
-                        <h2 style={{ transition: 'opacity 0.5s ease' }}>{getDynamicGreeting()}</h2>
-                        <p>{t.personalAssistant} · {t.warmMoments}</p>
+                <header className="modern-header">
+                    <div className="profile-group">
+                        <div className="avatar-circle">🥑</div>
+                        <div className="welcome-text">
+                            <h2>{getDynamicGreeting()}</h2>
+                            <p>{t.warmMoments}</p>
+                        </div>
                     </div>
-                    <button className="settings-btn" onClick={() => setView('settings')}>⚙️</button>
+                    <button className="settings-icon-btn" onClick={() => setView('settings')}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
                 </header>
+                
                 <Clock lang={settings.language} />
-                <div className="grid-nav">
-                    <div className="nav-card card-orange" onClick={() => setView('checkin')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>👟</span></div><span>{t.checkin}</span></div>
-                    <div className="nav-card card-blue" onClick={() => setView('food')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>🍎</span></div><span>{t.calories}</span></div>
-                    <div className="nav-card card-pink" onClick={() => setView('anniversary')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>❤️</span></div><span>{t.anniversary}</span></div>
-                    <div className="nav-card card-purple" onClick={() => setView('stats')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>📊</span></div><span>{t.stats}</span></div>
+
+                <div className="home-action-grid">
+                    <div className="action-card h-card-1" onClick={() => setView('checkin')}>
+                        <div className="action-icon">👟</div>
+                        <div className="action-label">{t.checkin}</div>
+                    </div>
+                    <div className="action-card h-card-2" onClick={() => setView('food')}>
+                        <div className="action-icon">🍎</div>
+                        <div className="action-label">{t.calories}</div>
+                    </div>
+                    <div className="action-card h-card-3" onClick={() => setView('anniversary')}>
+                        <div className="action-icon">❤️</div>
+                        <div className="action-label">{t.anniversary}</div>
+                    </div>
+                    <div className="action-card h-card-4" onClick={() => setView('stats')}>
+                        <div className="action-icon">📊</div>
+                        <div className="action-label">{t.stats}</div>
+                    </div>
                 </div>
-                <section className="footprint-section">
-                    <div className="section-title">✨ {t.todaySteps}</div>
-                    <div className="footprint-card">
-                        {todayRecords.length === 0 ? 
-                            <div className="empty-state"><p>{t.noRecords}</p></div> : 
-                            <ul style={{listStyle:'none', padding:0, margin:0}}>
-                                {todayRecords.map(r => (
-                                    <li key={r.id} className="record-item" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px', borderBottom:'1px solid var(--border-color)'}}>
-                                        <div style={{display:'flex', alignItems:'center'}}>
-                                            <div className="item-icon-small" style={{width:'44px', height:'44px', background:'var(--card-bg)', border:'1px solid var(--border-color)', borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px'}}>
-                                                <span>{r.activityType === 'wakeup' ? '🌅' : r.type === 'sport' ? '💪' : '📝'}</span>
-                                            </div>
-                                            <div style={{marginLeft:'14px'}}>
-                                                <p className="item-name" style={{margin:0, fontWeight:'800', fontSize:'15px'}}>{r.name}</p>
-                                                <p style={{fontSize:'12px', color:'var(--text-soft)', margin:'2px 0 0', fontWeight:'600'}}>
-                                                    {r.activityType === 'wakeup' && `🕒 ${r.time}`}
-                                                    {r.activityType === 'cardio' && `⏱️ ${r.duration}${t.min} ${r.distance ? `· 📍 ${r.distance}${r.unit}` : ''}`}
-                                                    {r.activityType === 'strength' && `🔥 ${r.sets}${t.groups} · 🔢 ${r.count}${t.times}`}
-                                                    {(r.activityType === 'habit' || r.activityType === 'general') && `⏱️ ${r.duration}${t.min}`}
-                                                </p>
+
+                <section className="timeline-section">
+                    <div className="section-header">
+                        <h3>✨ {t.todaySteps}</h3>
+                        {todayRecords.length > 0 && <span className="item-count">{todayRecords.length} 项</span>}
+                    </div>
+                    
+                    {todayRecords.length === 0 ? (
+                        <div className="timeline-empty">
+                            <div className="empty-illust">🌱</div>
+                            <p>{t.noRecords}</p>
+                        </div>
+                    ) : (
+                        <div className="timeline-container">
+                            {todayRecords.map((r, idx) => (
+                                <div key={r.id} className="timeline-node">
+                                    <div className="node-marker">
+                                        <div className="marker-dot"></div>
+                                        {idx !== todayRecords.length - 1 && <div className="marker-line"></div>}
+                                    </div>
+                                    <div className="node-card">
+                                        <div className="node-icon">{r.activityType === 'wakeup' ? '🌅' : r.type === 'sport' ? '💪' : '📝'}</div>
+                                        <div className="node-info">
+                                            <div className="node-title">{r.name}</div>
+                                            <div className="node-meta">
+                                                {r.activityType === 'wakeup' && `${r.time}`}
+                                                {r.activityType === 'cardio' && `${r.duration}${t.min}${r.distance ? ` · ${r.distance}${r.unit}` : ''}`}
+                                                {r.activityType === 'rope' && `${r.duration}${t.min} · ${r.count}${t.times}`}
+                                                {r.activityType === 'strength' && `${r.sets}${t.groups} · ${r.count}${t.times}`}
+                                                {['flexibility', 'habit', 'mind', 'daily', 'general'].includes(r.activityType) && `${r.duration}${t.min}`}
                                             </div>
                                         </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        }
-                    </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </section>
             </div>
         );
@@ -612,10 +657,18 @@ function App() {
                     {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
                 </main>
                 <nav className="bottom-nav">
-                    <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
-                    <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></button>
-                    <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}><FoodIcon active={view === 'food'} /><span>{t.calories}</span></button>
-                    <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></button>
+                    <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}>
+                        <div className="nav-btn-pill"><HomeIcon active={view === 'home'} /><span>{t.home}</span></div>
+                    </button>
+                    <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}>
+                        <div className="nav-btn-pill"><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></div>
+                    </button>
+                    <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}>
+                        <div className="nav-btn-pill"><FoodIcon active={view === 'food'} /><span>{t.calories}</span></div>
+                    </button>
+                    <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}>
+                        <div className="nav-btn-pill"><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></div>
+                    </button>
                 </nav>
             </div>
         </>
@@ -683,6 +736,7 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                 </div>
             </section>
             {guideType && (
+                /* Fix CSS blur() call in backdropFilter by changing it to a string literal 'blur(8px)' to avoid conflict with window.blur(). */
                 <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent:'center', padding: '24px' }}>
                     <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', background: 'white' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>{guideType === 'ios' ? '📱' : '🧭'}</div>
@@ -777,35 +831,154 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
     const [duration, setDuration] = useState<number>(30);
     const [distance, setDistance] = useState<number>(5);
     const [unit, setUnit] = useState<string>('km');
-    const [count, setCount] = useState<number>(10);
+    const [count, setCount] = useState<number>(200);
     const [sets, setSets] = useState<number>(3);
     const [wakeupTime, setWakeupTime] = useState<string>('07:00');
+    const [note, setNote] = useState<string>('');
 
+    // 完整的预置打卡项
     const SPORT_CATS = [
-        { title: t.categories.cardio, color: 'var(--card-blue)', items: [ { name: isZh ? '跑步' : 'Running', icon: '🏃', type: 'cardio' }, { name: isZh ? '游泳' : 'Swimming', icon: '🏊', type: 'cardio' } ] },
-        { title: t.categories.strength, color: 'var(--card-pink)', items: [ { name: isZh ? '俯卧撑' : 'Push-ups', icon: '💪', type: 'strength' }, { name: isZh ? '深蹲' : 'Squats', icon: '🦵', type: 'strength' } ] }
+        { title: t.categories.cardio, color: 'rgba(90, 200, 250, 0.1)', items: [ 
+            { name: isZh ? '户外跑步' : 'Running', icon: '🏃', type: 'cardio' }, 
+            { name: isZh ? '室内游泳' : 'Swimming', icon: '🏊', type: 'cardio' },
+            { name: isZh ? '单车骑行' : 'Cycling', icon: '🚴', type: 'cardio' },
+            { name: isZh ? '跳绳' : 'Rope', icon: '🪢', type: 'rope' },
+            { name: isZh ? '健走' : 'Walking', icon: '🚶', type: 'cardio' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'cardio' }
+        ] },
+        { title: t.categories.strength, color: 'rgba(255, 150, 113, 0.1)', items: [ 
+            { name: isZh ? '俯卧撑' : 'Push-ups', icon: '💪', type: 'strength' }, 
+            { name: isZh ? '深蹲训练' : 'Squats', icon: '🦵', type: 'strength' },
+            { name: isZh ? '哑铃训练' : 'Dumbbell', icon: '🏋️', type: 'strength' },
+            { name: isZh ? '核心平板' : 'Plank', icon: '🧘', type: 'strength' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'strength' }
+        ] },
+        { title: t.categories.flexibility, color: 'rgba(175, 82, 222, 0.1)', items: [ 
+            { name: isZh ? '瑜伽' : 'Yoga', icon: '🧘‍♀️', type: 'flexibility' }, 
+            { name: isZh ? '普拉提' : 'Pilates', icon: '🩰', type: 'flexibility' },
+            { name: isZh ? '拉伸' : 'Stretching', icon: '🙆', type: 'flexibility' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'flexibility' }
+        ] }
     ];
-    const LIFE_CATS = [ { title: t.categories.habits, color: 'var(--card-purple)', items: [ { name: isZh ? '早起' : 'Early Bird', icon: '🌅', type: 'wakeup' }, { name: isZh ? '多喝水' : 'Drink Water', icon: '💧', type: 'habit' } ] } ];
+
+    const LIFE_CATS = [ 
+        { title: t.categories.habits, color: 'rgba(175, 82, 222, 0.1)', items: [ 
+            { name: isZh ? '早起打卡' : 'Wake up', icon: '🌅', type: 'wakeup' }, 
+            { name: isZh ? '多喝水' : 'Drink Water', icon: '💧', type: 'habit' },
+            { name: isZh ? '阅读' : 'Reading', icon: '📖', type: 'habit' },
+            { name: isZh ? '护肤' : 'Skincare', icon: '✨', type: 'habit' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'habit' }
+        ] },
+        { title: t.categories.mind, color: 'rgba(90, 200, 250, 0.1)', items: [ 
+            { name: isZh ? '冥想' : 'Meditation', icon: '🧘‍♂️', type: 'mind' }, 
+            { name: isZh ? '写日记' : 'Journaling', icon: '✍️', type: 'mind' },
+            { name: isZh ? '听音乐' : 'Music', icon: '🎵', type: 'mind' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'mind' }
+        ] },
+        { title: t.categories.daily, color: 'rgba(255, 150, 113, 0.1)', items: [ 
+            { name: isZh ? '做家务' : 'Housework', icon: '🧹', type: 'daily' }, 
+            { name: isZh ? '烹饪' : 'Cooking', icon: '🍳', type: 'daily' },
+            { name: isZh ? '洗衣服' : 'Laundry', icon: '🧺', type: 'daily' },
+            { name: isZh ? t.categories.custom : 'Custom', icon: '⚙️', type: 'daily' }
+        ] }
+    ];
+    
     const cats = checkinSubTab === 'sport' ? SPORT_CATS : LIFE_CATS;
 
     if (selectedItem) return (
-        <div className="view">
-            <div className="sub-header"><button onClick={() => setSelectedItem(null)} className="back-btn-square">⬅️</button><h2>{t.checkinDetails}</h2></div>
-            <div className="detail-hero" style={{marginBottom: '32px'}}><div className="detail-icon-wrap" style={{background: 'var(--card-bg)', border: '1px solid var(--border-color)'}}>{selectedItem.icon}</div><div className="detail-title-group"><input type="text" className="detail-name-input" value={editName} onChange={(e) => setEditName(e.target.value)} /></div></div>
-            <div className="settings-section">
-                <div className="settings-card" style={{padding: '12px 20px'}}>
-                    {selectedItem.type === 'cardio' && <>
-                        <div className="setting-item"><span>⏱️ {t.duration} ({t.min})</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
-                        <div className="setting-item"><span>📍 {t.distance}</span><div style={{display: 'flex', gap: '8px'}}><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={distance} onChange={e => setDistance(Number(e.target.value))} /><div className="segment-control"><button className={unit === 'km' ? 'active' : ''} onClick={() => setUnit('km')}>km</button><button className={unit === 'm' ? 'active' : ''} onClick={() => setUnit('m')}>m</button></div></div></div>
-                    </>}
-                    {selectedItem.type === 'strength' && <>
-                        <div className="setting-item"><span>🔥 {t.sets}</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={sets} onChange={e => setSets(Number(e.target.value))} /></div>
-                        <div className="setting-item"><span>🔢 {t.count} ({t.times})</span><input type="number" className="time-input-simple" style={{maxWidth: '80px'}} value={count} onChange={e => setCount(Number(e.target.value))} /></div>
-                    </>}
-                    {selectedItem.type === 'wakeup' && <div className="setting-item"><span>🕒 {t.wakeTime}</span><input type="time" className="time-input-simple" value={wakeupTime} onChange={e => setWakeupTime(e.target.value)} /></div>}
-                </div>
+        <div className="view detail-view-animate">
+            <div className="sub-header">
+                <button onClick={() => setSelectedItem(null)} className="back-btn-square">⬅️</button>
+                <h2>{t.checkinDetails}</h2>
             </div>
-            <button className="btn-confirm highlight" onClick={() => handleAddRecord({ type: checkinSubTab, activityType: selectedItem.type, name: editName || selectedItem.name, category: selectedItem.category, duration, distance, unit, count, sets, time: wakeupTime })}>{t.complete} ✨</button>
+            
+            <div className="detail-card-main warm-theme">
+                <div className="detail-hero-section">
+                    <div className="detail-icon-large" style={{ background: cats.find(c => c.title === selectedItem.category)?.color.replace('0.1', '1') }}>
+                        {selectedItem.icon}
+                    </div>
+                    <div className="detail-name-wrap">
+                        <input 
+                            type="text" 
+                            className="detail-title-input" 
+                            value={editName === (isZh ? '自定义' : 'Custom') ? '' : editName} 
+                            onChange={(e) => setEditName(e.target.value)} 
+                            placeholder={t.matterName}
+                        />
+                        <span className="category-tag">{selectedItem.category}</span>
+                    </div>
+                </div>
+
+                <div className="form-content-wrap">
+                    {selectedItem.type === 'cardio' && (
+                        <div className="inputs-grid">
+                            <Stepper label={t.duration} value={duration} unit={t.min} onChange={setDuration} step={5} />
+                            <div className="input-with-toggle">
+                                <span className="stepper-label">{t.distance}</span>
+                                <div className="toggle-input-group">
+                                    <input type="number" className="minimal-number-input" value={distance} onChange={e => setDistance(Number(e.target.value))} />
+                                    <div className="mini-toggle">
+                                        <button className={unit === 'km' ? 'active' : ''} onClick={() => setUnit('km')}>km</button>
+                                        <button className={unit === 'm' ? 'active' : ''} onClick={() => setUnit('m')}>m</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedItem.type === 'rope' && (
+                        <div className="inputs-grid">
+                            <Stepper label={t.duration} value={duration} unit={t.min} onChange={setDuration} step={5} />
+                            <Stepper label={isZh ? '跳绳个数' : 'Count'} value={count} unit={t.times} onChange={setCount} step={100} />
+                        </div>
+                    )}
+
+                    {selectedItem.type === 'strength' && (
+                        <div className="inputs-grid">
+                            <Stepper label={t.sets} value={sets} unit={t.groups} onChange={setSets} />
+                            <Stepper label={t.count} value={count} unit={t.times} onChange={setCount} step={5} />
+                        </div>
+                    )}
+
+                    {selectedItem.type === 'wakeup' && (
+                        <div className="full-width-input">
+                            <span className="stepper-label">{t.wakeTime}</span>
+                            <input type="time" className="large-time-input" value={wakeupTime} onChange={e => setWakeupTime(e.target.value)} />
+                        </div>
+                    )}
+
+                    {['flexibility', 'habit', 'mind', 'daily', 'general'].includes(selectedItem.type) && (
+                        <div className="inputs-grid">
+                            <Stepper label={t.duration} value={duration} unit={t.min} onChange={setDuration} step={10} />
+                        </div>
+                    )}
+
+                    <div className="note-area-wrap">
+                        <span className="stepper-label">{isZh ? '写点感受' : 'How was it?'}</span>
+                        <div className="warm-textarea-container">
+                            <textarea 
+                                className="warm-textarea" 
+                                placeholder={t.notePlaceholder} 
+                                value={note} 
+                                onChange={e => setNote(e.target.value)}
+                            />
+                            <div className="note-decor">✍️</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button className="btn-confirm highlight glow" onClick={() => handleAddRecord({ 
+                    type: checkinSubTab, 
+                    activityType: selectedItem.type, 
+                    name: editName || selectedItem.name, 
+                    category: selectedItem.category, 
+                    duration, distance, unit, count, sets, 
+                    time: wakeupTime,
+                    note 
+                })}>
+                    {t.complete} ✨
+                </button>
+            </div>
         </div>
     );
 
@@ -813,7 +986,25 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.checkin}</h2></div>
             <div className="subtab-container"><div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div><button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button><button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button></div>
-            {cats.map(c => ( <div key={c.title}><h4 className="category-title">{c.title}</h4><div className="grid-nav">{c.items.map(i => ( <div key={i.name} className="nav-card" style={{background: 'var(--card-bg)', border: '1px solid var(--border-color)'}} onClick={() => {setSelectedItem({...i, category: c.title}); setEditName(i.name);}}><div className="icon-bg-wrap" style={{background: c.color}}><span>{i.icon}</span></div><span style={{fontWeight: '800', fontSize: '14px'}}>{i.name}</span></div> ))}</div></div> ))}
+            <div className="scroll-area-categories" style={{paddingBottom:'20px'}}>
+                {cats.map(c => ( 
+                    <div key={c.title} style={{marginBottom:'24px'}}>
+                        <h4 className="category-title-list">{c.title}</h4>
+                        <div className="category-list-container">
+                            {c.items.map(i => ( 
+                                <div key={i.name} className="category-item-row" onClick={() => {setSelectedItem({...i, category: c.title, color: c.color}); setEditName(i.name);}}>
+                                    <div className="category-item-indicator" style={{ background: c.color }}></div>
+                                    <div className="item-row-content">
+                                        <span className="item-icon">{i.icon}</span>
+                                        <span className="item-name">{i.name}</span>
+                                    </div>
+                                    <span className="item-arrow">›</span>
+                                </div> 
+                            ))}
+                        </div>
+                    </div> 
+                ))}
+            </div>
         </div>
     );
 }
@@ -823,7 +1014,11 @@ function StatsView({ t, statsData, setView, records }: any) {
     return (
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px', marginBottom:'24px'}}><div className="nav-card" style={{background:'var(--card-orange)'}}><span>连续</span><span>{statsData.streak}</span></div><div className="nav-card" style={{background:'var(--card-blue)'}}><span>今日</span><span>{statsData.todayCount}</span></div><div className="nav-card" style={{background:'var(--card-pink)'}}><span>累计</span><span>{records.length}</span></div></div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px', marginBottom:'24px'}}>
+                <div className="nav-card" style={{background:'var(--card-orange)'}}><span>{t.statLabels.streak}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{statsData.streak} {t.statLabels.days}</span></div>
+                <div className="nav-card" style={{background:'var(--card-blue)'}}><span>{t.statLabels.today}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{statsData.todayCount} {t.statLabels.items}</span></div>
+                <div className="nav-card" style={{background:'var(--card-pink)'}}><span>{t.statLabels.total}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{records.length} {t.statLabels.items}</span></div>
+            </div>
         </div>
     );
 }
