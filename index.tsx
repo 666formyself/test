@@ -254,172 +254,8 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
     );
 };
 
-// Frontend uses server proxy `/api/doubao`; no client-side secret required.
-
-async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, prompt: string) {
-    const model = 'doubao-seed-1-8-251228';
-
-    const resp = await fetch('/api/doubao', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64Data, mimeType, prompt, model })
-    });
-
-    if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(`Proxy error: ${resp.status} ${txt}`);
-    }
-
-
-    const json = await resp.json();
-    return json.result;
-}
-
-function parseDoubaoResult(res: any): string {
-    if (!res) return '';
-    // If provider returned wrapper { result: {...} }
-    if (res.result) return parseDoubaoResult(res.result);
-
-    // Common: `output` is an array with items that may contain `content` or `summary`.
-    // Collect candidate text fragments, then dedupe and remove fragments
-    // that are identical or wholly contained within another fragment.
-    if (Array.isArray(res.output) && res.output.length > 0) {
-        const parts: string[] = [];
-        const push = (val: any) => {
-            if (!val) return;
-            if (typeof val === 'string') parts.push(val.trim());
-            else if (val.text) parts.push(String(val.text).trim());
-        };
-
-        for (const out of res.output) {
-            if (out.summary && Array.isArray(out.summary)) {
-                for (const s of out.summary) push(s && (s.text || s));
-            }
-            if (out.content && Array.isArray(out.content)) {
-                for (const c of out.content) {
-                    if (!c) continue;
-                    if (typeof c === 'string') push(c);
-                    else if (c.type === 'output_text' && c.text) push(c.text);
-                    else if (c.type === 'message' && Array.isArray(c.content)) {
-                        for (const cc of c.content) if (cc && cc.type === 'output_text' && cc.text) push(cc.text);
-                    } else if (c.text) push(c.text);
-                }
-            }
-            if (out.text) push(out.text);
-        }
-
-        // Normalize and dedupe by exact match or containment
-        const normalized = parts.map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
-        const unique: string[] = [];
-        for (const p of normalized) {
-            let skipped = false;
-            for (let i = 0; i < unique.length; i++) {
-                const u = unique[i];
-                if (u === p) { skipped = true; break; }
-                if (u.includes(p)) { skipped = true; break; }
-                if (p.includes(u)) { unique[i] = p; skipped = true; break; }
-            }
-            if (!skipped) unique.push(p);
-        }
-        if (unique.length) return unique.join('\n\n');
-    }
-
-    // Older shapes: `output` may be string, or `outputs`/`choices` arrays
-    if (typeof res.output === 'string') return res.output;
-    if (Array.isArray(res.outputs) && res.outputs.length) {
-        const o = res.outputs[0];
-        if (o.content && o.content[0] && o.content[0].text) return o.content[0].text;
-        if (o.text) return o.text;
-    }
-    if (Array.isArray(res.choices) && res.choices.length) {
-        const c = res.choices[0];
-        if (c.text) return c.text;
-    }
-
-    // If it's already text
-    if (typeof res === 'string') return res;
-
-    // Fallback: pretty-print JSON so it's still readable
-    try { return JSON.stringify(res, null, 2); } catch (e) { return String(res); }
-}
-
-function makeShortSummary(text: string | null, maxChars = 180, maxLines = 4) {
-    if (!text) return '';
-    // prefer first paragraph
-    const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    let base = paragraphs.length ? paragraphs[0] : text;
-    // if contains numbered list, keep first few list items
-    const lines = base.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    const take = lines.slice(0, maxLines).join('\n');
-    const short = take.length <= maxChars ? take : take.slice(0, maxChars) + '…';
-    return short;
-}
-
-function cleanDoubaoText(text: string | null, maxFullChars = 600) {
-    if (!text) return '';
-    // remove likely instruction/meta lines and empty lines, dedupe paragraphs
-    const paras = text.split(/\n{1,}\s*\n{1,}|\r\n{2,}/).map(p => p.trim()).filter(Boolean);
-    const out: string[] = [];
-    for (const p of paras) {
-        // drop lines that look like instructions, checks, or chain-of-thought markers
-        if (/^(现在|请|注意|检查|整理|输出要求|只输出|Only return|Do not|Don't|Please|Now|Note)[:，,\s]/i.test(p)) continue;
-        if (/(现在整理|现在输出|现在检查|按照要求|输出要求|思考过程|过程|步骤|原因|解释|说明|提示|字数|检查字数|整理一下|现在|我将)/i.test(p)) continue;
-        const norm = p.replace(/\s+/g, ' ').trim();
-        // if this paragraph is contained in an already-kept paragraph, skip it
-        let isContained = false;
-        for (let i = 0; i < out.length; i++) {
-            const existingNorm = out[i].replace(/\s+/g, ' ').trim();
-            if (existingNorm === norm) { isContained = true; break; }
-            if (existingNorm.includes(norm)) { isContained = true; break; }
-            if (norm.includes(existingNorm)) {
-                // replace with the longer paragraph
-                out[i] = p;
-                isContained = true;
-                break;
-            }
-        }
-        if (isContained) continue;
-        out.push(p);
-    }
-    let result = out.join('\n\n');
-    // If still empty, fallback to original trimmed text
-    if (!result) result = text.trim();
-    if (result.length > maxFullChars) result = result.slice(0, maxFullChars) + '…';
-    return result;
-}
-
-// 强制将清理后的文本格式化为：第一行为一句话结论，随后最多 3 条要点。
-function formatFinalResult(text: string | null, maxFullChars = 600) {
-    if (!text) return '';
-    const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return '';
-
-    // 第一非空行作为结论，去掉常见前导编号或序号
-    let conclusion = lines[0].replace(/^[\s\d。.、\)\(①②③一二三四五六七八九十]+/, '').trim();
-
-    const bullets: string[] = [];
-    // 优先收集显式的要点行（以 -、数字序号等开头）
-    for (let i = 1; i < lines.length && bullets.length < 3; i++) {
-        const l = lines[i];
-        if (/^[-–—•·\*]\s*/.test(l) || /^[\d一二三四五六七八九十]+[)\.、]\s*/.test(l)) {
-            bullets.push(l.replace(/^[-–—•·\*\s\d一二三四五六七八九十\)\.、]+/, '').trim());
-        }
-    }
-
-    // 如果没有显式要点，则从剩余文本中按句子拆取最多 3 条
-    if (bullets.length === 0) {
-        const rest = lines.slice(1).join(' ');
-        const sents = rest.split(/[。.!?；;]+/).map(s => s.trim()).filter(Boolean);
-        for (const s of sents) {
-            if (bullets.length >= 3) break;
-            bullets.push(s);
-        }
-    }
-
-    let out = conclusion;
-    if (bullets.length) out += '\n' + bullets.slice(0, 3).map(b => '- ' + b).join('\n');
-    if (out.length > maxFullChars) out = out.slice(0, maxFullChars) + '…';
-    return out;
+// AI / Doubao helper functions removed — feature disabled. If you want to re-enable,
+// restore the server proxy calls and UI handling in the food view.
 }
 
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
@@ -492,7 +328,7 @@ const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, on
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
-    const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'anniversary'>('home');
+    const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary'>('home');
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
     const [records, setRecords] = useState<CheckInRecord[]>([]);
     const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
@@ -525,10 +361,6 @@ function App() {
     
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [editName, setEditName] = useState('');
-    const [calorieResult, setCalorieResult] = useState<string | null>(null);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
-    const [showFullResult, setShowFullResult] = useState(false);
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
@@ -673,36 +505,7 @@ function App() {
         if (settings.vibration) safeVibrate([50]);
     };
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setIsAnalyzing(true);
-        setCalorieResult(null);
-
-        // proceed to send image to serverless proxy; server reports errors if misconfigured
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const dataUrl = (reader.result as string);
-            setUploadedDataUrl(dataUrl);
-            const base64Data = dataUrl.split(',')[1];
-            try {
-                const prompt = settings.language === 'zh'
-                    ? `请严格按照下面格式输出（只输出正文，不要有任何额外注释、提示或重复的说明）：\n
-1) 第一行：一句话结论（不超过30字）。\n2) 接着最多3条要点，每条不超过60字，包含热量估算与1-2条实用营养建议（每条开头用短破折号或数字）。\n3) 全文不要超过600字。\n\n只输出结果正文，禁止任何格式说明、字数检查或多余重复内容。`
-                    : `Strictly output only the requested content, no extra commentary, no repetition, no instructions:\n\n1) First line: one-line summary (<=30 words).\n2) Then up to 3 bullet points, each <=60 words, include calorie estimate and 1-2 practical nutrition tips.\n3) Total output must not exceed 600 words.\n\nOutput only the result body. Do NOT repeat the prompt, do NOT add any notes or checks.`;
-                const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
-                let textOutput = parseDoubaoResult(response) || '';
-                textOutput = cleanDoubaoText(textOutput, 600);
-                // 最终强制格式化，保证只包含结论与最多三条要点，去除思路与多余说明
-                textOutput = formatFinalResult(textOutput, 600);
-                setCalorieResult(textOutput);
-            } catch (err: any) {
-                const msg = err?.message || String(err);
-                setCalorieResult(settings.language === 'zh' ? `分析失败：${msg}` : `Analysis failed: ${msg}`);
-            } finally { setIsAnalyzing(false); }
-        };
-        reader.readAsDataURL(file);
-    };
+    // AI image upload handler removed (feature disabled)
 
     const renderHome = () => {
         const today = new Date().setHours(0,0,0,0);
@@ -729,10 +532,7 @@ function App() {
                         <div className="action-icon">👟</div>
                         <div className="action-label">{t.checkin}</div>
                     </div>
-                    <div className="action-card h-card-2" onClick={() => setView('food')}>
-                        <div className="action-icon">🍎</div>
-                        <div className="action-label">{t.calories}</div>
-                    </div>
+                    {/* AI 热量功能已移除 */}
                     <div className="action-card h-card-3" onClick={() => setView('anniversary')}>
                         <div className="action-icon">❤️</div>
                         <div className="action-label">{t.anniversary}</div>
@@ -796,58 +596,7 @@ function App() {
                 <main className="content-area">
                     {view === 'home' && renderHome()}
                     {view === 'checkin' && <CheckinSelection t={t} checkinSubTab={checkinSubTab} setCheckinSubTab={setCheckinSubTab} setSelectedItem={setSelectedItem} handleAddRecord={handleAddRecord} setView={setView} selectedItem={selectedItem} editName={editName} setEditName={setEditName} settings={settings} />}
-                    {view === 'food' && (
-                        <div className="view">
-                            <div className="sub-header">
-                                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
-                                <h2>AI {t.calories}</h2>
-                            </div>
-                            <div className="detail-card" style={{background:'var(--card-bg)', padding:'32px', borderRadius:'40px', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-soft)'}}>
-                                {isAnalyzing ? (
-                                    <div style={{textAlign:'center', padding:'40px 0'}}>
-                                        <div className="loading-spinner" style={{width:'48px', height:'48px', border:'4px solid var(--accent-light)', borderTopColor:'var(--accent)', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto 20px'}}></div>
-                                        <p style={{fontWeight:'700', color:'var(--text-soft)'}}>分析中...</p>
-                                    </div>
-                                ) : calorieResult ? (
-                                    <div style={{animation:'fadeIn 0.5s ease'}}>
-                                        <div style={{display:'flex', flexDirection:'column', gap:'12px', alignItems:'center', justifyContent:'center', marginBottom:'18px', paddingBottom:'12px', borderBottom:'2px dashed var(--accent-light)'}}>
-                                            {uploadedDataUrl && (
-                                                <div style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                                    <img src={uploadedDataUrl} alt="upload" style={{width:'160px', height:'160px', objectFit:'cover', borderRadius:'12px', boxShadow:'var(--shadow-soft)', display:'block'}} />
-                                                </div>
-                                            )}
-                                            <div style={{width: '100%', maxWidth: '560px'}}>
-                                                <h3 style={{margin:'0 0 8px', fontSize:'18px', fontWeight:'900', color:'var(--accent)', textAlign:'left'}}>{t.aiVision}</h3>
-                                                <div style={{textAlign:'left', whiteSpace:'pre-wrap', lineHeight:'1.6', color:'var(--text-main)', fontSize:'14px', fontWeight:'600'}}>
-                                                    {(() => {
-                                                        const short = makeShortSummary(calorieResult, 180, 4);
-                                                        if (showFullResult) {
-                                                            if (!calorieResult) return '';
-                                                            return calorieResult.length > 600 ? calorieResult.slice(0, 600) + '…' : calorieResult;
-                                                        }
-                                                        return short || calorieResult || '';
-                                                    })()}
-                                                </div>
-                                                {calorieResult && calorieResult.length > 180 && (
-                                                    <button onClick={() => setShowFullResult(s => !s)} className="link-btn" style={{marginTop:'12px'}}>{showFullResult ? '收起' : '展开全文'}</button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div style={{display:'flex', gap:'12px'}}>
-                                            <button onClick={() => { setCalorieResult(null); setUploadedDataUrl(null); setShowFullResult(false); }} className="btn-confirm highlight" style={{marginTop:'0', width:'100%', height:'56px'}}>🔄 {t.rescan}</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <label style={{cursor:'pointer', display:'block', textAlign:'center', padding:'40px 0'}}>
-                                        <input type="file" hidden onChange={handleImageUpload} />
-                                        <div style={{width:'100px', height:'100px', background:'var(--card-orange)', borderRadius:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', margin:'0 auto 24px', boxShadow:'0 8px 20px rgba(255,150,113,0.1)'}}>📸</div>
-                                        <h3 style={{fontSize:'20px', fontWeight:'850', color:'var(--text-main)'}}>{t.scanFood}</h3>
-                                        <p style={{color:'var(--text-soft)', marginTop:'8px', fontWeight:'700', fontSize:'13px'}}>拍照即刻获知热量建议</p>
-                                    </label>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    {/* AI 热量功能已从界面移除 */}
                     {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                     {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
                     {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
@@ -859,9 +608,7 @@ function App() {
                     <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}>
                         <div className="nav-btn-pill"><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></div>
                     </button>
-                    <button onClick={() => setView('food')} className={view === 'food' ? 'active' : ''}>
-                        <div className="nav-btn-pill"><FoodIcon active={view === 'food'} /><span>{t.calories}</span></div>
-                    </button>
+                    {/* 食物/热量页已移除 */}
                     <button onClick={() => setView('stats')} className={view === 'stats' ? 'active' : ''}>
                         <div className="nav-btn-pill"><StatsIcon active={view === 'stats'} /><span>{t.stats}</span></div>
                     </button>
