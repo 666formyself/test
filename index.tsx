@@ -65,7 +65,9 @@ const TRANSLATIONS = {
         general: '通用设置', language: '多语言设置', darkMode: '深色模式',
         followSystem: '跟随系统', manualControl: '手动开关',
         addToHome: '添加到手机主界面',
-        addToHomeGuide: '为了更好的体验，请点击浏览器下方的“分享”按钮，然后选择“添加到主屏幕”✨',
+        addToHomeGuideIOS: '请点击浏览器下方的“分享”按钮，然后选择“添加到主屏幕”✨',
+        addToHomeGuideQuark: '请点击底部“三”菜单按钮，在弹出的面板中选择“添加到桌面”图标 📍',
+        addToHomeGuideDefault: '请在浏览器菜单中寻找“安装应用”或“添加到主屏幕”选项',
         storage: '存储与缓存', clearCache: '清除本地记录', storageUsage: '已保存记录',
         confirmClear: '确定要清除所有记录吗？此操作无法撤销。',
         langOptions: { zh: '中文简体', en: 'English' },
@@ -111,7 +113,9 @@ const TRANSLATIONS = {
         general: 'General', language: 'Language', darkMode: 'Night Mode',
         followSystem: 'Follow System', manualControl: 'Manual Toggle',
         addToHome: 'Add to Home Screen',
-        addToHomeGuide: 'For best experience, tap the "Share" button and select "Add to Home Screen" ✨',
+        addToHomeGuideIOS: 'Tap the "Share" button and select "Add to Home Screen" ✨',
+        addToHomeGuideQuark: 'Tap the "Menu" (three lines) button at the bottom and select "Add to Desktop" 📍',
+        addToHomeGuideDefault: 'Look for "Install App" or "Add to Home Screen" in your browser menu.',
         storage: 'Storage & Cache', clearCache: 'Clear Cache', storageUsage: 'Saved',
         confirmClear: 'Clear all records? This cannot be undone.',
         langOptions: { zh: 'Simplified Chinese', en: 'English' },
@@ -406,7 +410,7 @@ function App() {
 function SettingsView({ t, settings, setSettings, setView, records, setRecords, deferredPrompt, setDeferredPrompt }: any) {
     const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
     const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
-    const [showInstallGuide, setShowInstallGuide] = useState(false);
+    const [guideType, setGuideType] = useState<'ios' | 'quark' | 'default' | null>(null);
 
     const handleInstall = async () => {
         if (deferredPrompt) {
@@ -414,10 +418,13 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             const { outcome } = await deferredPrompt.userChoice;
             if (outcome === 'accepted') setDeferredPrompt(null);
         } else {
-            // Check if it's iOS
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-            if (isIOS) setShowInstallGuide(true);
-            else alert(t.addToHomeGuide);
+            const ua = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+            const isQuark = /Quark/.test(ua);
+            
+            if (isQuark) setGuideType('quark');
+            else if (isIOS) setGuideType('ios');
+            else setGuideType('default');
         }
     };
 
@@ -524,13 +531,32 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                 </div>
             </section>
 
-            {showInstallGuide && (
-                <div className="drawer-overlay" onClick={() => setShowInstallGuide(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            {guideType && (
+                <div className="drawer-overlay" onClick={() => setGuideType(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
                     <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', animation: 'slideInUp 0.4s cubic-bezier(0, 0, 0.2, 1)' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                            {guideType === 'ios' ? '📱' : guideType === 'quark' ? '🧭' : '✨'}
+                        </div>
                         <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '850' }}>{t.addToHome}</h3>
-                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>{t.addToHomeGuide}</p>
-                        <button onClick={() => setShowInstallGuide(false)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
+                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>
+                            {guideType === 'ios' && t.addToHomeGuideIOS}
+                            {guideType === 'quark' && t.addToHomeGuideQuark}
+                            {guideType === 'default' && t.addToHomeGuideDefault}
+                        </p>
+                        {guideType === 'quark' && (
+                            <div style={{ background: '#F4F4F7', borderRadius: '20px', padding: '16px', marginBottom: '24px', display: 'flex', justifyContent: 'center', gap: '20px', opacity: 0.8 }}>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>三</div>
+                                    <span style={{ fontSize: '10px', fontWeight: '800' }}>底部菜单</span>
+                                </div>
+                                <div style={{ alignSelf: 'center', fontSize: '18px' }}>➜</div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', margin: '0 auto 4px' }}>🏠</div>
+                                    <span style={{ fontSize: '10px', fontWeight: '800' }}>添加到桌面</span>
+                                </div>
+                            </div>
+                        )}
+                        <button onClick={() => setGuideType(null)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
                     </div>
                 </div>
             )}
