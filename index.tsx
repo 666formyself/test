@@ -275,6 +275,55 @@ async function callDoubaoImageAnalysis(base64Data: string, mimeType: string, pro
     return json.result;
 }
 
+function parseDoubaoResult(res: any): string {
+    if (!res) return '';
+    // If provider returned wrapper { result: {...} }
+    if (res.result) return parseDoubaoResult(res.result);
+
+    // Common: `output` is an array with items that may contain `content` or `summary`
+    if (Array.isArray(res.output) && res.output.length > 0) {
+        const parts: string[] = [];
+        for (const out of res.output) {
+            if (out.summary && Array.isArray(out.summary)) {
+                for (const s of out.summary) {
+                    if (s && s.type === 'summary_text' && s.text) parts.push(s.text);
+                }
+            }
+            if (out.content && Array.isArray(out.content)) {
+                for (const c of out.content) {
+                    if (!c) continue;
+                    if (c.type === 'output_text' && c.text) parts.push(c.text);
+                    // some responses nest a message object
+                    if (c.type === 'message' && Array.isArray(c.content)) {
+                        for (const cc of c.content) {
+                            if (cc.type === 'output_text' && cc.text) parts.push(cc.text);
+                        }
+                    }
+                }
+            }
+        }
+        if (parts.length) return parts.join('\n\n');
+    }
+
+    // Older shapes: `output` may be string, or `outputs`/`choices` arrays
+    if (typeof res.output === 'string') return res.output;
+    if (Array.isArray(res.outputs) && res.outputs.length) {
+        const o = res.outputs[0];
+        if (o.content && o.content[0] && o.content[0].text) return o.content[0].text;
+        if (o.text) return o.text;
+    }
+    if (Array.isArray(res.choices) && res.choices.length) {
+        const c = res.choices[0];
+        if (c.text) return c.text;
+    }
+
+    // If it's already text
+    if (typeof res === 'string') return res;
+
+    // Fallback: pretty-print JSON so it's still readable
+    try { return JSON.stringify(res, null, 2); } catch (e) { return String(res); }
+}
+
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
     useEffect(() => {
@@ -537,14 +586,8 @@ function App() {
             try {
                 const prompt = settings.language === 'zh' ? "请分析这张图片中的食物，估计其热量（卡路里），并给出简单的营养建议。请分条列出。请用中文回答。" : "Please analyze the food in this image, estimate its calories, and provide simple nutritional advice. List them in bullet points. Please answer in English.";
                 const response = await callDoubaoImageAnalysis(base64Data, file.type, prompt);
-                // response may be the raw provider object; try to extract useful text
-                let textOutput = '';
-                if (!response) textOutput = '';
-                else if (typeof response === 'string') textOutput = response;
-                else if (response.output && typeof response.output === 'string') textOutput = response.output;
-                else if (response.result && typeof response.result === 'string') textOutput = response.result;
-                else textOutput = JSON.stringify(response, null, 2);
-                setCalorieResult(textOutput || '');
+                const textOutput = parseDoubaoResult(response) || '';
+                setCalorieResult(textOutput);
             } catch (err: any) {
                 const msg = err?.message || String(err);
                 setCalorieResult(settings.language === 'zh' ? `分析失败：${msg}` : `Analysis failed: ${msg}`);
