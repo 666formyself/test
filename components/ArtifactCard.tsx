@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Artifact } from '../types';
+import { sanitizeHtml } from '../utils';
 
 interface ArtifactCardProps {
     artifact: Artifact;
@@ -45,7 +46,7 @@ const ArtifactCard = React.memo(({
                     </div>
                 )}
                 <iframe 
-                    srcDoc={artifact.html} 
+                    srcDoc={sanitizeHtml(artifact.html)} 
                     title={artifact.id} 
                     sandbox="allow-scripts allow-forms allow-modals allow-popups allow-presentation"
                     className="artifact-iframe"
