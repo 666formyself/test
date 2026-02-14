@@ -1,23 +1,25 @@
 
 import { GoogleGenAI } from '@google/genai';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 
-// --- Types & Interfaces ---
+// --- Types ---
+type ActivityType = 'cardio' | 'strength' | 'habit' | 'wakeup' | 'general';
+
 interface CheckInRecord {
     id: string;
     type: 'sport' | 'event';
+    activityType: ActivityType;
     name: string;
     category: string;
-    duration: number;
+    duration?: number; // 分钟
+    distance?: number; // 公里/米
+    unit?: string;
+    count?: number; // 个数
+    sets?: number; // 组数
+    time?: string; // 起床时间
     note: string;
     timestamp: number;
-}
-
-interface Anniversary {
-    id: string;
-    title: string;
-    date: string;
 }
 
 interface AppSettings {
@@ -25,40 +27,53 @@ interface AppSettings {
     isDarkMode: boolean;
     pushNotifications: boolean;
     inAppPopups: boolean;
-    reminderFreq: number;
-    reminderInterval: number;
-    dndStart: string;
-    dndEnd: string;
-    auxReminder: boolean;
-    msgCenter: boolean;
     vibration: boolean;
-    animationIntensity: 'off' | 'low' | 'medium' | 'high';
 }
 
 const TRANSLATIONS = {
     zh: {
         home: '主页', checkin: '打卡', calories: '热量', stats: '统计',
-        anniversary: '纪念日', settings: '偏好设置', reminders: '提醒设置',
+        anniversary: '纪念日', settings: '偏好设置', 
         todaySteps: '今日足迹', noRecords: '今天还没留下小印记呢~',
         personalAssistant: '私人生活助理', warmMoments: '记录温暖的小日子',
-        nextTime: '稍后再说', complete: '打卡完成', matterName: '事项名称',
-        duration: '持续时长 (分钟)', quickNote: '快速备注',
-        checkinDetails: '打卡细节', comingSoon: '功能开发中',
-        sportCheck: '运动打卡', eventCheck: '生活打卡',
+        complete: '打卡完成', matterName: '事项名称', duration: '持续时长',
+        checkinDetails: '打卡细节', sportCheck: '运动打卡', eventCheck: '生活打卡',
+        general: '通用设置', language: '多语言设置', darkMode: '深色模式',
+        storage: '存储与缓存', clearCache: '清除本地记录', storageUsage: '已保存记录',
+        confirmClear: '确定要清除所有打卡记录吗？此操作无法撤销。',
+        langOptions: { zh: '中文简体', en: 'English' },
+        aiVision: 'AI 视觉分析', scanFood: '扫描食物',
         successMsg: '太棒啦✨', successSub: '坚持就是胜利💪',
-        addAnniversary: '新增纪念日'
+        nextTime: '稍后再说', customTask: '自定义任务',
+        distance: '运动距离', km: '公里', m: '米',
+        count: '个数', sets: '组数', times: '次', groups: '组',
+        wakeTime: '起床时间', min: '分钟',
+        categories: {
+            cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
+            habits: '自律习惯', mind: '精神寄托', housework: '家务琐事'
+        }
     },
     en: {
         home: 'Home', checkin: 'Check-in', calories: 'Calories', stats: 'Stats',
-        anniversary: 'Anniversary', settings: 'Settings', reminders: 'Reminders',
-        todaySteps: "Today's Journey", noRecords: 'No records yet today~',
-        personalAssistant: 'Personal Assistant', warmMoments: 'Warm moments',
-        nextTime: 'Maybe later', complete: 'Check-in Done', matterName: 'Task Name',
-        duration: 'Duration (Min)', quickNote: 'Quick Note',
-        checkinDetails: 'Details', comingSoon: 'Coming Soon',
-        sportCheck: 'Sport', eventCheck: 'Life',
+        anniversary: 'Anniversary', settings: 'Settings',
+        todaySteps: "Today's Journey", noRecords: 'No records today yet~',
+        personalAssistant: 'Assistant', warmMoments: 'Warm moments',
+        complete: 'Done', matterName: 'Task Name', duration: 'Duration',
+        checkinDetails: 'Details', sportCheck: 'Sport', eventCheck: 'Life',
+        general: 'General', language: 'Language', darkMode: 'Dark Mode',
+        storage: 'Storage & Cache', clearCache: 'Clear Cache', storageUsage: 'Saved',
+        confirmClear: 'Clear all records? This cannot be undone.',
+        langOptions: { zh: 'Simplified Chinese', en: 'English' },
+        aiVision: 'AI Vision', scanFood: 'Scan Food',
         successMsg: 'Awesome! ✨', successSub: 'Consistency is key 💪',
-        addAnniversary: 'Add Anniversary'
+        nextTime: 'Later', customTask: 'Custom Task',
+        distance: 'Distance', km: 'km', m: 'm',
+        count: 'Count', sets: 'Sets', times: 'times', groups: 'sets',
+        wakeTime: 'Wake-up Time', min: 'min',
+        categories: {
+            cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
+            habits: 'Habits', mind: 'Mindfulness', housework: 'Housework'
+        }
     }
 };
 
@@ -76,54 +91,54 @@ const StatsIcon = ({ active }: { active: boolean }) => (
 );
 
 function App() {
-    const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings' | 'reminders' | 'msg_center' | 'anniversary'>('home');
+    const [view, setView] = useState<'home' | 'checkin' | 'food' | 'stats' | 'settings'>('home');
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
     const [records, setRecords] = useState<CheckInRecord[]>([]);
-    const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh', isDarkMode: false, pushNotifications: true,
-        inAppPopups: true, reminderFreq: 1, reminderInterval: 10,
-        dndStart: '23:00', dndEnd: '07:00', auxReminder: true,
-        msgCenter: true, vibration: true, animationIntensity: 'medium'
+        inAppPopups: true, vibration: true
     });
 
     const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [activeNoteTag, setActiveNoteTag] = useState<string | null>(null);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [editName, setEditName] = useState('');
     const [calorieResult, setCalorieResult] = useState<string | null>(null);
-    const [greeting, setGreeting] = useState('');
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const t = TRANSLATIONS[settings.language];
+    const firstUpdate = useRef(true);
 
     useEffect(() => {
         const savedRecords = localStorage.getItem('jq_records');
         const savedSettings = localStorage.getItem('jq_settings');
-        const savedAnnis = localStorage.getItem('jq_annis');
         if (savedRecords) setRecords(JSON.parse(savedRecords));
         if (savedSettings) setSettings(JSON.parse(savedSettings));
-        if (savedAnnis) setAnniversaries(JSON.parse(savedAnnis));
-
-        const hour = new Date().getHours();
-        if (hour < 5) setGreeting('深夜了，早点休息呀');
-        else if (hour < 11) setGreeting('早安，开启活力一天');
-        else if (hour < 14) setGreeting('午后好，记得休息下');
-        else if (hour < 18) setGreeting('下午好，继续加油');
-        else setGreeting('晚上好，忙碌一天辛苦了');
     }, []);
 
     useEffect(() => {
+        if (firstUpdate.current) {
+            firstUpdate.current = false;
+            return;
+        }
         localStorage.setItem('jq_records', JSON.stringify(records));
         localStorage.setItem('jq_settings', JSON.stringify(settings));
-        localStorage.setItem('jq_annis', JSON.stringify(anniversaries));
         document.body.className = settings.isDarkMode ? 'dark' : '';
-    }, [records, settings, anniversaries]);
+    }, [records, settings]);
+
+    const changeLanguage = (lang: 'zh' | 'en') => {
+        if (lang === settings.language) return;
+        setIsRefreshing(true);
+        setTimeout(() => {
+            setSettings(prev => ({ ...prev, language: lang }));
+            setTimeout(() => setIsRefreshing(false), 300);
+        }, 50);
+    };
 
     const handleAddRecord = (record: Omit<CheckInRecord, 'id' | 'timestamp'>) => {
         const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
         setRecords([newRecord, ...records]);
         setShowSuccess(true);
-        if (settings.vibration && navigator.vibrate) navigator.vibrate([100, 50, 100]);
         setTimeout(() => {
             setShowSuccess(false);
             setSelectedItem(null);
@@ -131,324 +146,376 @@ function App() {
         }, 2200);
     };
 
+    const handleClearCache = () => {
+        if (window.confirm(t.confirmClear)) {
+            setRecords([]);
+            alert(settings.language === 'zh' ? '清理成功' : 'Cleared');
+        }
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         setIsAnalyzing(true);
         setCalorieResult(null);
-
-        try {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64Data = (reader.result as string).split(',')[1];
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const base64Data = event.target?.result?.toString().split(',')[1];
+            if (!base64Data) return;
+            try {
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
                     contents: {
                         parts: [
                             { inlineData: { data: base64Data, mimeType: file.type } },
-                            { text: `请识别图片中的食物并提供简明扼要的热量分析。请列出：1.食物名称 2.每100克大致卡路里 3.健康建议。请使用${settings.language === 'zh' ? '中文' : '英文'}回答。` }
+                            { text: settings.language === 'zh' ? '识别食物并估算卡路里' : 'Identify food and estimate calories' }
                         ]
                     }
                 });
-                setCalorieResult(response.text || "识别失败");
-                setIsAnalyzing(false);
-            };
-        } catch (error) {
-            console.error(error);
-            setCalorieResult("分析出了一点小状况，换张图试试？");
-            setIsAnalyzing(false);
-        }
+                setCalorieResult(response.text);
+            } catch (error) { setCalorieResult("Error"); }
+            finally { setIsAnalyzing(false); }
+        };
+        reader.readAsDataURL(file);
     };
 
-    const renderSuccessOverlay = () => (
-        <div className="success-overlay">
-            <div className="success-content">
-                <div className="confetti-emoji">✨</div>
-                <h2 className="success-title">{t.successMsg}</h2>
-                <p className="success-subtext">{t.successSub}</p>
-            </div>
-        </div>
-    );
-
-    const renderHome = () => {
-        const today = new Date().setHours(0, 0, 0, 0);
-        const todayRecords = records.filter(r => new Date(r.timestamp).setHours(0, 0, 0, 0) === today);
-
-        return (
-            <div className="view">
-                <header className="user-header">
-                    <div className="avatar">🥑</div>
-                    <div className="info">
-                        <h2>{greeting}</h2>
-                        <p>{t.personalAssistant} · {t.warmMoments}</p>
-                    </div>
-                    <button className="settings-btn" onClick={() => setView('settings')}>⚙️</button>
-                </header>
-
-                <div className="grid-nav">
-                    <div className="nav-card card-orange" onClick={() => { setView('checkin'); setSelectedItem(null); }}>
-                        <div className="icon-bg-wrap"><img src="https://img.icons8.com/emoji/96/running-shoe.png" width="36" alt="打卡" /></div>
-                        <span>{t.checkin}</span>
-                    </div>
-                    <div className="nav-card card-blue" onClick={() => setView('food')}>
-                        <div className="icon-bg-wrap"><img src="https://img.icons8.com/emoji/96/fork-and-knife-with-plate.png" width="36" alt="热量" /></div>
-                        <span>{t.calories}</span>
-                    </div>
-                    <div className="nav-card card-pink" onClick={() => setView('anniversary')}>
-                        <div className="icon-bg-wrap"><img src="https://img.icons8.com/emoji/96/heart-suit.png" width="36" alt="纪念日" /></div>
-                        <span>{t.anniversary}</span>
-                    </div>
-                    <div className="nav-card card-purple" onClick={() => setView('stats')}>
-                        <div className="icon-bg-wrap"><img src="https://img.icons8.com/emoji/96/bar-chart.png" width="36" alt="统计" /></div>
-                        <span>{t.stats}</span>
-                    </div>
-                </div>
-
-                <section className="footprint-section">
-                    <div className="section-title">✨ {t.todaySteps}</div>
-                    <div className="footprint-card">
-                        {todayRecords.length === 0 ? (
-                            <div className="empty-state">
-                                <p>{t.noRecords}</p>
-                                <div className="sleepy-emoji-wrap">
-                                   <img src="https://img.icons8.com/emoji/96/sleeping-face.png" width="64" alt="sleepy" />
-                                </div>
-                            </div>
-                        ) : (
-                            <ul className="record-list">
-                                {todayRecords.map(r => (
-                                    <li key={r.id} className="record-item">
-                                        <div className="item-main">
-                                            <div className="item-icon-small">
-                                                <img src={r.type === 'sport' ? 'https://img.icons8.com/emoji/48/flexed-biceps.png' : 'https://img.icons8.com/emoji/48/memo.png'} width="22" alt="icon" />
-                                            </div>
-                                            <div className="item-text">
-                                                <p className="item-name">{r.name}</p>
-                                                <p className="item-time">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                            </div>
-                                        </div>
-                                        <div className="item-right-icon">🌱</div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </section>
-                <p className="version-info">jiaqian助理 · 陪伴你的第 {Math.ceil((Date.now() - (records[records.length-1]?.timestamp || Date.now())) / 86400000) || 1} 天</p>
-            </div>
-        );
-    };
-
-    const renderCheckinDetails = () => (
+    const renderSettings = () => (
         <div className="view">
             <div className="sub-header">
-                <button onClick={() => setSelectedItem(null)} className="back-btn-square">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-                <h2>{t.checkinDetails}</h2>
+                <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
+                <h2>{t.settings}</h2>
             </div>
-            <div className="detail-card">
-                <div className="sport-header" style={{display:'flex', alignItems:'center', gap:'20px', marginBottom:'32px'}}>
-                    <div className="sport-emoji-large" style={{width:'80px', height:'80px', background:'var(--bg-color)', borderRadius:'28px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid var(--border-color)', boxShadow:'0 8px 16px rgba(0,0,0,0.03)'}}>
-                        <img src={selectedItem.type === 'sport' ? 'https://img.icons8.com/emoji/96/person-running.png' : 'https://img.icons8.com/emoji/96/memo.png'} width="56" alt="icon" />
+            <div className="settings-section-title">{t.language}</div>
+            <div className="settings-card">
+                <div className="radio-group" style={{padding:'8px'}}>
+                    <div className={`cartoon-radio ${settings.language === 'zh' ? 'selected' : ''}`} onClick={() => changeLanguage('zh')}>
+                        <span className="radio-label">{t.langOptions.zh}</span>
+                        <div className="check-mark">✓</div>
                     </div>
-                    <div style={{flex: 1}}>
-                        <p className="category-label" style={{color:'var(--accent)', fontSize:'11px', background:'var(--accent-light)', padding:'2px 8px', borderRadius:'10px', display:'inline-block'}}>{selectedItem.category}</p>
-                        <h3 style={{marginTop:'4px', fontSize:'24px', letterSpacing:'-0.5px'}}>{selectedItem.isCustom ? (selectedItem.name || '自定义') : selectedItem.name}</h3>
-                    </div>
-                </div>
-                
-                <div className="input-group">
-                    <label>{t.matterName}</label>
-                    <input type="text" className="text-input-light" 
-                        defaultValue={selectedItem.isCustom ? '' : selectedItem.name} 
-                        placeholder={selectedItem.isCustom ? '输入任务名...' : ''} id="matter-name" 
-                        autoFocus={selectedItem.isCustom}
-                    />
-                </div>
-
-                <div className="input-group">
-                    <div className="label-row" style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
-                        <label>{t.duration}</label>
-                        <span id="duration-val" className="duration-highlight">{selectedItem.duration || 30}</span>
-                    </div>
-                    <input type="range" className="peach-range" min="0" max="120" step="5" defaultValue={selectedItem.duration || 30} id="duration-slider" onChange={(e) => {
-                        const val = document.getElementById('duration-val');
-                        if (val) val.innerText = e.target.value;
-                    }} />
-                    <div style={{display:'flex', justifyContent:'space-between', marginTop:'-10px', fontSize:'11px', color:'var(--text-soft)', fontWeight:'700'}}>
-                        <span>0m</span>
-                        <span>60m</span>
-                        <span>120m</span>
-                    </div>
-                </div>
-
-                <div className="input-group">
-                    <label>{t.quickNote}</label>
-                    <div className="chip-group" style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'15px'}}>
-                        {['轻松完成', '中途休息', '下次加油', '太棒了', '身体微酸'].map(tag => (
-                            <button 
-                                key={tag} 
-                                className={`chip ${activeNoteTag === tag ? 'selected' : ''}`} 
-                                onClick={() => {
-                                    setActiveNoteTag(tag);
-                                    const area = document.getElementById('note-area') as HTMLTextAreaElement;
-                                    if (area) area.value = tag;
-                                }}
-                            >{tag}</button>
-                        ))}
-                    </div>
-                    <textarea placeholder="记下此刻的心情..." rows={5} id="note-area" className="textarea-light" />
-                </div>
-
-                <div className="action-buttons-row" style={{display:'flex', gap:'16px', marginTop:'40px'}}>
-                    <button className="btn-secondary-light" style={{flex:1}} onClick={() => setSelectedItem(null)}>{t.nextTime}</button>
-                    <button className="btn-primary-peach" style={{flex:2}} onClick={() => {
-                        const nameEl = document.getElementById('matter-name') as HTMLInputElement;
-                        const durEl = document.getElementById('duration-slider') as HTMLInputElement;
-                        const noteEl = document.getElementById('note-area') as HTMLTextAreaElement;
-                        handleAddRecord({ 
-                            type: selectedItem.type, 
-                            name: nameEl?.value || selectedItem.name, 
-                            category: selectedItem.category, 
-                            duration: parseInt(durEl?.value || "30"), 
-                            note: noteEl?.value || "" 
-                        });
-                    }}>{t.complete}</button>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderFood = () => (
-        <div className="view">
-            <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-                <h2>AI {t.calories}</h2>
-            </div>
-            <div className="food-main-card">
-                <div className="food-placeholder-dashed">
-                    {isAnalyzing ? (
-                        <div className="analyzing-state">
-                            <div className="pulse-loader"></div>
-                            <p style={{marginTop:'20px', fontWeight:'700', color: 'var(--accent)'}}>正在努力扫描食物...</p>
-                        </div>
-                    ) : calorieResult ? (
-                        <div className="calorie-result-display fade-in">
-                            <h3>🔍 识别结果</h3>
-                            <div className="result-text-content">{calorieResult}</div>
-                            <button className="btn-retry" style={{marginTop:'20px', background:'var(--accent)', color:'white', border:'none', padding:'10px 20px', borderRadius:'12px', fontWeight:'700'}} onClick={() => setCalorieResult(null)}>重拍一张</button>
-                        </div>
-                    ) : (
-                        <label className="camera-upload-label" style={{cursor:'pointer', display:'block'}}>
-                            <input type="file" accept="image/*" onChange={handleImageUpload} hidden />
-                            <div className="camera-icon-wrap" style={{marginBottom:'15px'}}>
-                                <img src="https://img.icons8.com/emoji/96/camera-with-flash.png" width="64" alt="camera" />
-                            </div>
-                            <p style={{fontSize:'18px', fontWeight:'800', margin:'0 0 8px'}}>点击扫描食物</p>
-                            <small style={{color:'var(--text-soft)', fontWeight:'600'}}>由 Gemini AI 提供视觉支持</small>
-                        </label>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderStats = () => (
-        <div className="view">
-             <div className="sub-header">
-                <button onClick={() => setView('home')} className="back-btn-square">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-                <h2>我的{t.stats}</h2>
-            </div>
-            <div className="stats-dashboard">
-                <div className="stats-row" style={{display:'flex', gap:'15px', marginBottom:'24px'}}>
-                    <div className="stats-card-mini">
-                        <span className="stats-val">{records.length}</span>
-                        <span className="stats-label">本月打卡</span>
-                    </div>
-                    <div className="stats-card-mini">
-                        <span className="stats-val">🔥</span>
-                        <span className="stats-label">最高连续</span>
-                    </div>
-                </div>
-                <div className="heatmap-card" style={{background:'var(--input-bg)', borderRadius:'24px', padding:'24px', border:'1px solid var(--border-color)'}}>
-                    <p className="group-title" style={{margin:'0 0 20px'}}>打卡频率</p>
-                    <div className="mock-heatmap" style={{display:'flex', gap:'8px', height:'100px', alignItems:'flex-end'}}>
-                        {[20, 50, 80, 40, 90, 60, 100].map((h, i) => (
-                            <div key={i} className="heatmap-bar" style={{ flex:1, height: `${h}%`, background:'var(--accent)', borderRadius:'6px', opacity: h/100 }}></div>
-                        ))}
+                    <div className={`cartoon-radio ${settings.language === 'en' ? 'selected' : ''}`} onClick={() => changeLanguage('en')}>
+                        <span className="radio-label">{t.langOptions.en}</span>
+                        <div className="check-mark">✓</div>
                     </div>
                 </div>
             </div>
+            <div className="settings-section-title">{t.general}</div>
+            <div className="settings-card">
+                <div className="setting-item">
+                    <span className="radio-label">{t.darkMode}</span>
+                    <label className="switch">
+                        <input type="checkbox" checked={settings.isDarkMode} onChange={() => setSettings(s => ({...s, isDarkMode: !s.isDarkMode}))} />
+                        <span className="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <button className="btn-danger-soft" onClick={handleClearCache}>{t.clearCache}</button>
         </div>
     );
 
     const renderCheckinSelection = () => {
+        const isZh = settings.language === 'zh';
         const SPORT_CATS = [
-            { title: '有氧训练', color:'var(--cardio-bg)', items: [{ name: '晨跑' }, { name: '游泳' }, { name: '跳绳' }, { name: '自行车' }] },
-            { title: '塑形力量', color:'var(--strength-bg)', items: [{ name: '哑铃' }, { name: '核心' }, { name: '深蹲' }, { name: '平板支撑' }] },
-            { title: '柔韧拉伸', color:'var(--flex-bg)', items: [{ name: '瑜伽' }, { name: '普拉提' }, { name: '拉伸' }] }
+            { 
+                title: t.categories.cardio, 
+                color:'var(--card-blue)', 
+                items: [
+                    {name: isZh ? '晨跑' : 'Jogging', icon: '🏃', type: 'cardio' as ActivityType}, 
+                    {name: isZh ? '游泳' : 'Swimming', icon: '🏊', type: 'cardio' as ActivityType}, 
+                    {name: isZh ? '自行车' : 'Cycling', icon: '🚲', type: 'cardio' as ActivityType},
+                    {name: isZh ? '跳绳' : 'Jump Rope', icon: '➰', type: 'strength' as ActivityType},
+                    {name: isZh ? '步行' : 'Walking', icon: '🚶', type: 'cardio' as ActivityType}
+                ] 
+            },
+            { 
+                title: t.categories.strength, 
+                color:'var(--card-orange)', 
+                items: [
+                    {name: isZh ? '深蹲' : 'Squat', icon: '💪', type: 'strength' as ActivityType}, 
+                    {name: isZh ? '俯卧撑' : 'Push-ups', icon: '🏋️', type: 'strength' as ActivityType},
+                    {name: isZh ? '核心' : 'Core', icon: '🧘', type: 'strength' as ActivityType}
+                ] 
+            },
+            {
+                title: t.categories.flexibility,
+                color:'var(--card-pink)',
+                items: [
+                    {name: isZh ? '瑜伽' : 'Yoga', icon: '🤸', type: 'general' as ActivityType},
+                    {name: isZh ? '拉伸' : 'Stretching', icon: '🙆', type: 'general' as ActivityType}
+                ]
+            }
         ];
         const LIFE_CATS = [
-            { title: '自律习惯', color:'var(--cardio-bg)', items: [{ name: '早起' }, { name: '多喝水' }, { name: '冥想' }] },
-            { title: '温暖时刻', color:'var(--strength-bg)', items: [{ name: '惊喜' }, { name: '给家人的爱' }, { name: '散步' }] }
+            { 
+                title: t.categories.habits, 
+                color:'var(--card-purple)', 
+                items: [
+                    {name: isZh ? '早起' : 'Early Bird', icon: '🌅', type: 'wakeup' as ActivityType}, 
+                    {name: isZh ? '多喝水' : 'Drink Water', icon: '💧', type: 'habit' as ActivityType}, 
+                    {name: isZh ? '阅读' : 'Reading', icon: '📖', type: 'habit' as ActivityType}
+                ] 
+            },
+            {
+                title: t.categories.mind,
+                color: 'var(--card-blue)',
+                items: [
+                    {name: isZh ? '冥想' : 'Meditate', icon: '🧠', type: 'habit' as ActivityType},
+                    {name: isZh ? '护肤' : 'Skincare', icon: '✨', type: 'habit' as ActivityType}
+                ]
+            },
+            {
+                title: t.categories.housework,
+                color: 'var(--card-orange)',
+                items: [
+                    {name: isZh ? '大扫除' : 'Cleaning', icon: '🧹', type: 'habit' as ActivityType},
+                    {name: isZh ? '下厨' : 'Cooking', icon: '🍳', type: 'habit' as ActivityType}
+                ]
+            }
         ];
         const cats = checkinSubTab === 'sport' ? SPORT_CATS : LIFE_CATS;
-        const iconSrc = checkinSubTab === 'sport' ? 'https://img.icons8.com/emoji/48/flexed-biceps.png' : 'https://img.icons8.com/emoji/48/memo.png';
 
-        if (selectedItem) return renderCheckinDetails();
+        const openDetail = (item: any) => {
+            setSelectedItem(item);
+            setEditName(item.name.includes('自定义') || item.name.includes('Custom') ? '' : item.name);
+        };
+
+        if (selectedItem) return (
+            <div className="view">
+                <div className="sub-header">
+                    <button onClick={() => setSelectedItem(null)} className="back-btn-square">⬅️</button>
+                    <h2>{t.checkinDetails}</h2>
+                </div>
+                <div className="detail-card">
+                    <div style={{display:'flex', gap:'20px', marginBottom:'24px', alignItems:'center'}}>
+                        <div style={{width:'80px', height:'80px', background:'var(--input-bg)', borderRadius:'24px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px', border:'1px solid var(--border-color)'}}>{selectedItem.icon}</div>
+                        <div style={{flex:1}}>
+                            <p style={{color:'var(--accent)', fontSize:'12px', fontWeight:'800', marginBottom:'4px'}}>{selectedItem.category}</p>
+                            <input 
+                                type="text" 
+                                className="name-edit-input" 
+                                placeholder={t.matterName}
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Specialized Inputs based on ActivityType */}
+                    {selectedItem.type === 'cardio' && (
+                        <>
+                            <div className="input-group" style={{marginBottom:'20px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+                                    <label style={{fontWeight:'700', color:'var(--text-soft)'}}>{t.duration}</label>
+                                    <span style={{color:'var(--accent)', fontWeight:'800'}}><span id="dur-val">30</span> {t.min}</span>
+                                </div>
+                                <input type="range" className="peach-range" style={{width:'100%'}} min="0" max="120" defaultValue="30" id="dur-s" onChange={(e) => {
+                                    const val = document.getElementById('dur-val');
+                                    if (val) val.innerText = e.target.value;
+                                }} />
+                            </div>
+                            <div className="input-group" style={{marginBottom:'20px'}}>
+                                <label style={{fontWeight:'700', color:'var(--text-soft)', display:'block', marginBottom:'10px'}}>{t.distance}</label>
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <input type="number" id="dist-v" className="text-input-compact" placeholder="0.0" step="0.1" style={{flex: 2.5, minWidth: '100px'}} />
+                                    <select id="dist-u" className="select-compact" style={{flex: 1, minWidth: '75px'}}>
+                                        <option value="km">{t.km}</option>
+                                        <option value="m">{t.m}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {selectedItem.type === 'strength' && (
+                        <div className="input-group" style={{marginBottom:'20px', display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'15px'}}>
+                            <div style={{minWidth: 0}}>
+                                <label style={{fontWeight:'700', color:'var(--text-soft)', display:'block', marginBottom:'10px'}}>{t.count}</label>
+                                <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                    <input type="number" id="count-v" className="text-input-compact" placeholder="0" style={{flex:1, minWidth: 0}} />
+                                    <span style={{fontSize:'12px', color:'var(--text-soft)', flexShrink: 0}}>{t.times}</span>
+                                </div>
+                            </div>
+                            <div style={{minWidth: 0}}>
+                                <label style={{fontWeight:'700', color:'var(--text-soft)', display:'block', marginBottom:'10px'}}>{t.sets}</label>
+                                <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                    <input type="number" id="sets-v" className="text-input-compact" placeholder="0" style={{flex:1, minWidth: 0}} />
+                                    <span style={{fontSize:'12px', color:'var(--text-soft)', flexShrink: 0}}>{t.groups}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedItem.type === 'wakeup' && (
+                        <div className="input-group" style={{marginBottom:'24px'}}>
+                            <label style={{fontWeight:'700', color:'var(--text-soft)', display:'block', marginBottom:'10px'}}>{t.wakeTime}</label>
+                            <input type="time" id="wake-v" className="text-input-compact" defaultValue="07:30" style={{width:'100%', fontSize:'20px', textAlign:'center', height:'60px'}} />
+                        </div>
+                    )}
+
+                    {(selectedItem.type === 'habit' || selectedItem.type === 'general') && (
+                        <div className="input-group" style={{marginBottom:'24px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+                                <label style={{fontWeight:'700', color:'var(--text-soft)'}}>{t.duration}</label>
+                                <span style={{color:'var(--accent)', fontWeight:'800'}}><span id="dur-val-h">30</span> {t.min}</span>
+                            </div>
+                            <input type="range" className="peach-range" style={{width:'100%'}} min="0" max="180" defaultValue="30" id="dur-h" onChange={(e) => {
+                                const val = document.getElementById('dur-val-h');
+                                if (val) val.innerText = e.target.value;
+                            }} />
+                        </div>
+                    )}
+
+                    <div className="input-group" style={{marginBottom:'24px'}}>
+                        <label style={{fontWeight:'700', color:'var(--text-soft)', display:'block', marginBottom:'10px'}}>{settings.language === 'zh' ? '备注' : 'Note'}</label>
+                        <textarea placeholder={isZh ? "记下此刻的心情..." : "Note your mood..."} id="note-a" className="textarea-light" rows={2} />
+                    </div>
+
+                    <div style={{display:'flex', gap:'12px'}}>
+                        <button className="btn-danger-soft" style={{marginTop:0, flex:1, borderRadius:'18px'}} onClick={() => setSelectedItem(null)}>{t.nextTime}</button>
+                        <button className="back-btn-square" style={{width:'auto', flex:2, height:'58px', borderRadius:'18px', background:'var(--accent)', fontSize:'16px', fontWeight:'800'}} onClick={() => {
+                            const finalName = editName.trim() || selectedItem.name;
+                            const note = (document.getElementById('note-a') as HTMLTextAreaElement).value;
+                            
+                            let payload: any = {
+                                type: checkinSubTab,
+                                activityType: selectedItem.type,
+                                name: finalName,
+                                category: selectedItem.category,
+                                note: note
+                            };
+
+                            if (selectedItem.type === 'cardio') {
+                                payload.duration = parseInt((document.getElementById('dur-s') as HTMLInputElement).value);
+                                payload.distance = parseFloat((document.getElementById('dist-v') as HTMLInputElement).value) || 0;
+                                payload.unit = (document.getElementById('dist-u') as HTMLSelectElement).value;
+                            } else if (selectedItem.type === 'strength') {
+                                payload.count = parseInt((document.getElementById('count-v') as HTMLInputElement).value) || 0;
+                                payload.sets = parseInt((document.getElementById('sets-v') as HTMLInputElement).value) || 0;
+                            } else if (selectedItem.type === 'wakeup') {
+                                payload.time = (document.getElementById('wake-v') as HTMLInputElement).value;
+                            } else {
+                                payload.duration = parseInt((document.getElementById('dur-h') as HTMLInputElement).value) || 0;
+                            }
+
+                            handleAddRecord(payload);
+                        }}>{t.complete}</button>
+                    </div>
+                </div>
+            </div>
+        );
 
         return (
             <div className="view">
-                 <div className="sub-header">
-                    <button onClick={() => setView('home')} className="back-btn-square">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                    </button>
+                <div className="sub-header">
+                    <button onClick={() => setView('home')} className="back-btn-square">⬅️</button>
                     <h2>{t.checkin}</h2>
                 </div>
-                <div className="tab-switcher-pill">
-                    <button className={checkinSubTab === 'sport' ? 'active' : ''} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button>
-                    <button className={checkinSubTab === 'event' ? 'active' : ''} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button>
+                <div style={{display:'flex', background:'var(--input-bg)', borderRadius:'16px', padding:'4px', marginBottom:'24px'}}>
+                    <button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} style={{flex:1, border:'none', background: checkinSubTab === 'sport' ? 'var(--card-bg)' : 'none', padding:'12px', borderRadius:'12px', color: checkinSubTab === 'sport' ? 'var(--accent)' : 'var(--text-soft)', fontWeight:'800'}} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button>
+                    <button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} style={{flex:1, border:'none', background: checkinSubTab === 'event' ? 'var(--card-bg)' : 'none', padding:'12px', borderRadius:'12px', color: checkinSubTab === 'event' ? 'var(--accent)' : 'var(--text-soft)', fontWeight:'800'}} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button>
                 </div>
-                {cats.map(cat => (
-                    <div key={cat.title} className="category-section">
-                        <h4>{cat.title}</h4>
-                        <div className="item-grid-col3">
-                            {cat.items.map(item => (
-                                <div key={item.name} className="item-button-card" style={{borderColor: cat.color}} onClick={() => setSelectedItem({ ...item, type: checkinSubTab, category: cat.title, isCustom: false })}>
-                                    <span className="item-icon-wrap" style={{background: cat.color}}><img src={iconSrc} width="28" alt="icon" /></span>
-                                    <span className="item-label-small">{item.name}</span>
+                {cats.map(c => (
+                    <div key={c.title} style={{marginBottom:'24px'}}>
+                        <h4 style={{margin:'0 0 12px 8px', color:'var(--text-soft)', fontSize:'14px'}}>{c.title}</h4>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
+                            {c.items.map(i => (
+                                <div key={i.name} className="nav-card" style={{background: c.color, border:'none', padding: '16px'}} onClick={() => openDetail({...i, category: c.title})}>
+                                    <span style={{fontSize:'28px', marginBottom:'4px'}}>{i.icon}</span>
+                                    <span style={{fontWeight:'700', fontSize:'13px'}}>{i.name}</span>
                                 </div>
                             ))}
-                            <div className="item-button-dashed-card" onClick={() => setSelectedItem({ name: '', type: checkinSubTab, category: cat.title, isCustom: true })}>
-                                <span className="item-icon-plus">+</span>
-                                <span className="item-label-small-peach">自定义</span>
+                            <div className="nav-card" style={{border:'2px dashed var(--border-color)', background:'none', padding: '16px'}} onClick={() => openDetail({name: isZh ? '自定义任务' : 'Custom Task', icon: '📝', category: c.title, type: checkinSubTab === 'sport' ? 'strength' : 'habit'})}>
+                                <span style={{fontSize:'28px', marginBottom:'4px'}}>➕</span>
+                                <span style={{fontWeight:'700', fontSize:'13px', color:'var(--accent)'}}>{isZh ? '自定义' : 'Custom'}</span>
                             </div>
                         </div>
                     </div>
                 ))}
             </div>
         );
-    }
+    };
+
+    const renderHome = () => {
+        const today = new Date().setHours(0,0,0,0);
+        const todayRecords = records.filter(r => new Date(r.timestamp).setHours(0,0,0,0) === today);
+        return (
+            <div className="view">
+                <header className="user-header">
+                    <div className="avatar">🥑</div>
+                    <div className="info">
+                        <h2>{settings.language === 'zh' ? '你好，开启活力一天' : 'Hello, active day!'}</h2>
+                        <p>{t.personalAssistant} · {t.warmMoments}</p>
+                    </div>
+                    <button className="settings-btn" onClick={() => setView('settings')}>⚙️</button>
+                </header>
+                <div className="grid-nav">
+                    <div className="nav-card card-orange" onClick={() => setView('checkin')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>👟</span></div><span>{t.checkin}</span></div>
+                    <div className="nav-card card-blue" onClick={() => setView('food')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>🍎</span></div><span>{t.calories}</span></div>
+                    <div className="nav-card card-pink" onClick={() => {}}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>❤️</span></div><span>{t.anniversary}</span></div>
+                    <div className="nav-card card-purple" onClick={() => setView('stats')}><div className="icon-bg-wrap"><span style={{fontSize:'32px'}}>📊</span></div><span>{t.stats}</span></div>
+                </div>
+                <section className="footprint-section">
+                    <div className="section-title">✨ {t.todaySteps}</div>
+                    <div className="footprint-card">
+                        {todayRecords.length === 0 ? <div className="empty-state"><p>{t.noRecords}</p></div> : 
+                        <ul style={{listStyle:'none', padding:0, margin:0}}>{todayRecords.map(r => (
+                            <li key={r.id} className="record-item">
+                                <div style={{display:'flex', alignItems:'center'}}>
+                                    <div className="item-icon-small"><span>{r.activityType === 'wakeup' ? '🌅' : r.type === 'sport' ? '💪' : '📝'}</span></div>
+                                    <div style={{marginLeft:'12px'}}>
+                                        <p className="item-name" style={{margin:0}}>{r.name}</p>
+                                        <p style={{fontSize:'11px', color:'var(--text-soft)', margin:'2px 0 0'}}>
+                                            {r.activityType === 'wakeup' && `🕒 ${r.time}`}
+                                            {r.activityType === 'cardio' && `⏱️ ${r.duration}min · 📍 ${r.distance}${r.unit}`}
+                                            {r.activityType === 'strength' && `🔥 ${r.sets}${t.groups} · 🔢 ${r.count}${t.times}`}
+                                            {(r.activityType === 'habit' || r.activityType === 'general') && `⏱️ ${r.duration}min`}
+                                            {` · ${r.category}`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style={{opacity:0.3}}>🌱</div>
+                            </li>
+                        ))}</ul>}
+                    </div>
+                </section>
+            </div>
+        );
+    };
 
     return (
-        <div className="app-container">
-            {showSuccess && renderSuccessOverlay()}
+        <div className={`app-container ${isRefreshing ? 'refresh-anim' : ''}`}>
+            {showSuccess && (
+                <div className="success-overlay" style={{position:'fixed', inset:0, background: settings.isDarkMode ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)', zIndex:2000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center'}}>
+                    <span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span>
+                    <h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1>
+                    <p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p>
+                </div>
+            )}
             <main className="content-area">
                 {view === 'home' && renderHome()}
                 {view === 'checkin' && renderCheckinSelection()}
-                {view === 'food' && renderFood()}
-                {view === 'stats' && renderStats()}
-                {view === 'settings' && <div className="view"><div className="sub-header"><button onClick={()=>setView('home')} className="back-btn-square">⬅️</button><h2>{t.settings}</h2></div><div className="settings-card"><div className="setting-item" onClick={()=>setSettings({...settings, isDarkMode: !settings.isDarkMode})}>🌙 深色模式 {settings.isDarkMode ? '已开启':'已关闭'}</div></div></div>}
+                {view === 'food' && (
+                    <div className="view">
+                        <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>AI {t.calories}</h2></div>
+                        <div className="detail-card" style={{textAlign:'center', background:'var(--card-bg)', padding:'40px', borderRadius:'32px', border:'1px solid var(--border-color)'}}>
+                            {isAnalyzing ? <div className="refresh-anim">Analyzing...</div> : calorieResult ? <div className="refresh-anim" style={{textAlign:'left', whiteSpace:'pre-wrap'}}>{calorieResult}</div> : (
+                                <label style={{cursor:'pointer'}}><input type="file" hidden onChange={handleImageUpload} /><div style={{fontSize:'64px', marginBottom:'20px'}}>📸</div><h3>{t.scanFood}</h3></label>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {view === 'stats' && (
+                    <div className="view">
+                        <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
+                        <div className="settings-card" style={{padding:'32px', textAlign:'center'}}>
+                            <div style={{fontSize:'48px', marginBottom:'16px'}}>📊</div>
+                            <p style={{fontSize:'20px', fontWeight:'800', margin:0}}>{records.length}</p>
+                            <p style={{color:'var(--text-soft)', fontSize:'14px'}}>{settings.language === 'zh' ? '总打卡次数' : 'Total Check-ins'}</p>
+                        </div>
+                    </div>
+                )}
+                {view === 'settings' && renderSettings()}
             </main>
-
             <nav className="bottom-nav">
                 <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
                 <button onClick={() => {setView('checkin'); setSelectedItem(null);}} className={view === 'checkin' ? 'active' : ''}><CheckIcon active={view === 'checkin'} /><span>{t.checkin}</span></button>
