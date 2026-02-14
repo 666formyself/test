@@ -360,6 +360,9 @@ function App() {
     
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [editName, setEditName] = useState('');
+    // pending duplicate add flow
+    const [pendingRecord, setPendingRecord] = useState<Omit<CheckInRecord, 'id' | 'timestamp'> | null>(null);
+    const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
@@ -497,11 +500,34 @@ function App() {
     }, [records, settings.language]);
 
     const handleAddRecord = (record: Omit<CheckInRecord, 'id' | 'timestamp'>) => {
-        const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
-        setRecords([newRecord, ...records]);
-        setShowSuccess(true);
-        setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
-        if (settings.vibration) safeVibrate([50]);
+        // Prevent duplicate records of same activity/type on the same calendar day
+        try {
+            const todayStart = new Date().setHours(0,0,0,0);
+            const existsSameDay = records.some(r => {
+                const rDay = new Date(r.timestamp).setHours(0,0,0,0);
+                return rDay === todayStart && r.activityType === record.activityType && r.type === record.type && r.name === record.name;
+            });
+            if (existsSameDay) {
+                // show in-app confirmation to allow user to still add if desired
+                setPendingRecord(record);
+                setShowDuplicateConfirm(true);
+                if (settings.vibration) safeVibrate([30]);
+                try { triggerNotification(t.notif.title, (settings.language === 'zh' ? '检测到今日已记录相同项目，是否仍然添加？' : 'Detected same activity recorded today — add anyway?')); } catch (e) { }
+                return;
+            }
+
+            const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
+            setRecords([newRecord, ...records]);
+            setShowSuccess(true);
+            setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+            if (settings.vibration) safeVibrate([50]);
+        } catch (e) {
+            const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
+            setRecords([newRecord, ...records]);
+            setShowSuccess(true);
+            setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+            if (settings.vibration) safeVibrate([50]);
+        }
     };
 
     // AI image upload handler removed (feature disabled)
@@ -591,6 +617,31 @@ function App() {
                 
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
+                )}
+                {showDuplicateConfirm && pendingRecord && (
+                    <div className="modal-overlay" onClick={() => { setShowDuplicateConfirm(false); setPendingRecord(null); }}>
+                        <div className="modal-card prettier-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+                            <div className="modal-header">
+                                <div className="modal-icon">⚠️</div>
+                                <div>
+                                    <div className="modal-title">{settings.language === 'zh' ? '检测到重复打卡' : 'Duplicate check-in detected'}</div>
+                                    <div className="modal-sub">{settings.language === 'zh' ? '今日已记录相同项目，是否仍然添加？' : 'The same activity was already recorded today. Add anyway?'}</div>
+                                </div>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="modal-btn modal-btn-primary" onClick={() => {
+                                    const rec = pendingRecord as Omit<CheckInRecord, 'id' | 'timestamp'>;
+                                    const newRecord: CheckInRecord = { ...rec, id: Math.random().toString(36).substr(2,9), timestamp: Date.now() };
+                                    setRecords([newRecord, ...records]);
+                                    setShowDuplicateConfirm(false);
+                                    setPendingRecord(null);
+                                    setShowSuccess(true);
+                                    setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+                                }}>{settings.language === 'zh' ? '仍然添加' : 'Add Anyway'}</button>
+                                <button className="modal-btn modal-btn-ghost" onClick={() => { setShowDuplicateConfirm(false); setPendingRecord(null); }}>{settings.language === 'zh' ? '取消' : 'Cancel'}</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
                 <main className="content-area">
                     {view === 'home' && renderHome()}
