@@ -256,7 +256,6 @@ const Clock = ({ lang }: { lang: 'zh' | 'en' }) => {
 
 // AI / Doubao helper functions removed — feature disabled. If you want to re-enable,
 // restore the server proxy calls and UI handling in the food view.
-}
 
 const SplashScreen = ({ onFinish, onFadeStart, t }: { onFinish: () => void, onFadeStart?: () => void, t: any }) => {
     const [fadeOut, setFadeOut] = useState(false);
