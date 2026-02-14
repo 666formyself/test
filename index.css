@@ -106,11 +106,26 @@ body.dark .settings-card { background: #1C1C23; }
 }
 body.dark .setting-item { border-color: rgba(255,255,255,0.03); }
 
+.setting-item-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid #F9F9F9;
+    min-height: 64px;
+    background: none;
+    cursor: pointer;
+}
+.setting-item-btn:active {
+    opacity: 0.6;
+}
+
 .setting-item:last-child {
     border-bottom: none;
 }
 
-.setting-item span {
+.setting-item span, .setting-item-btn span {
     font-size: 15px;
     font-weight: 700;
 }

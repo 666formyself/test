@@ -64,6 +64,8 @@ const TRANSLATIONS = {
         checkinDetails: '打卡细节', sportCheck: '运动打卡', eventCheck: '生活打卡',
         general: '通用设置', language: '多语言设置', darkMode: '深色模式',
         followSystem: '跟随系统', manualControl: '手动开关',
+        addToHome: '添加到手机主界面',
+        addToHomeGuide: '为了更好的体验，请点击浏览器下方的“分享”按钮，然后选择“添加到主屏幕”✨',
         storage: '存储与缓存', clearCache: '清除本地记录', storageUsage: '已保存记录',
         confirmClear: '确定要清除所有记录吗？此操作无法撤销。',
         langOptions: { zh: '中文简体', en: 'English' },
@@ -108,6 +110,8 @@ const TRANSLATIONS = {
         checkinDetails: 'Details', sportCheck: 'Sport', eventCheck: 'Life',
         general: 'General', language: 'Language', darkMode: 'Night Mode',
         followSystem: 'Follow System', manualControl: 'Manual Toggle',
+        addToHome: 'Add to Home Screen',
+        addToHomeGuide: 'For best experience, tap the "Share" button and select "Add to Home Screen" ✨',
         storage: 'Storage & Cache', clearCache: 'Clear Cache', storageUsage: 'Saved',
         confirmClear: 'Clear all records? This cannot be undone.',
         langOptions: { zh: 'Simplified Chinese', en: 'English' },
@@ -186,6 +190,7 @@ function App() {
     const [records, setRecords] = useState<CheckInRecord[]>([]);
     const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh',
@@ -217,6 +222,12 @@ function App() {
     const firstUpdate = useRef(true);
 
     useEffect(() => {
+        const handleBeforeInstall = (e: any) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+        
         const savedRecords = localStorage.getItem('jq_records');
         const savedSettings = localStorage.getItem('jq_settings');
         const savedAnniv = localStorage.getItem('jq_anniv');
@@ -226,6 +237,7 @@ function App() {
             const parsed = JSON.parse(savedSettings);
             setSettings(prev => ({ ...prev, ...parsed }));
         }
+        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     }, []);
 
     useEffect(() => {
@@ -379,7 +391,7 @@ function App() {
                 {view === 'food' && (<div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>AI {t.calories}</h2></div><div className="detail-card" style={{textAlign:'center', background:'var(--card-bg)', padding:'40px', borderRadius:'32px', border:'1px solid var(--border-color)'}}>{isAnalyzing ? <div className="refresh-anim">Analyzing...</div> : calorieResult ? <div className="refresh-anim" style={{textAlign:'left', whiteSpace:'pre-wrap'}}>{calorieResult}</div> : (<label style={{cursor:'pointer'}}><input type="file" hidden onChange={handleImageUpload} /><div style={{fontSize:'64px', marginBottom:'20px'}}>📸</div><h3>{t.scanFood}</h3></label>)}</div></div>)}
                 {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                 {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
-                {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} />}
+                {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
             </main>
             <nav className="bottom-nav">
                 <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}><HomeIcon active={view === 'home'} /><span>{t.home}</span></button>
@@ -391,9 +403,23 @@ function App() {
     );
 }
 
-function SettingsView({ t, settings, setSettings, setView, records, setRecords }: any) {
+function SettingsView({ t, settings, setSettings, setView, records, setRecords, deferredPrompt, setDeferredPrompt }: any) {
     const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
     const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
+    const [showInstallGuide, setShowInstallGuide] = useState(false);
+
+    const handleInstall = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') setDeferredPrompt(null);
+        } else {
+            // Check if it's iOS
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+            if (isIOS) setShowInstallGuide(true);
+            else alert(t.addToHomeGuide);
+        }
+    };
 
     return (
         <div className="view">
@@ -428,6 +454,10 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords }
                             </label>
                         </div>
                     )}
+                    <button className="setting-item-btn" onClick={handleInstall} style={{ borderBottom: 'none' }}>
+                        <span>{t.addToHome}</span>
+                        <span style={{ fontSize: '18px', color: 'var(--accent)' }}>📲</span>
+                    </button>
                 </div>
             </section>
 
@@ -493,6 +523,17 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords }
                     </button>
                 </div>
             </section>
+
+            {showInstallGuide && (
+                <div className="drawer-overlay" onClick={() => setShowInstallGuide(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                    <div className="valentine-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', borderRadius: '40px', padding: '32px 24px', textAlign: 'center', animation: 'slideInUp 0.4s cubic-bezier(0, 0, 0.2, 1)' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
+                        <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '850' }}>{t.addToHome}</h3>
+                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>{t.addToHomeGuide}</p>
+                        <button onClick={() => setShowInstallGuide(false)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -507,7 +548,6 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
     useEffect(() => {
         const now = new Date();
         const isFeb14 = now.getMonth() === 1 && now.getDate() === 14;
-        // 修改点：移除 sessionStorage 检查，使得每次打开纪念日界面都能看到祝福弹窗
         if (isFeb14) {
             setShowValentine(true);
         }
