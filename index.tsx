@@ -123,6 +123,15 @@ const TRANSLATIONS = {
             weekly: '周活跃度', distribution: '生活分布', topItems: '最常进行',
             days: '天', items: '项'
         },
+        calendar: {
+            exportTitle: '导出到系统日历',
+            exportDesc: '生成 .ics 文件，导入手机日历获得后台提醒',
+            exportBtn: '生成日历文件',
+            exportSuccess: '日历文件已生成，请选择"打开"导入',
+            noReminders: '请先开启至少一种提醒（定点提醒或打卡提醒）',
+            iosTip: 'iOS 用户：下载后在分享菜单中选择"添加日历"',
+            androidTip: 'Android 用户：下载后用日历应用打开即可导入'
+        },
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
             habits: '自律习惯', mind: '精神寄托', daily: '日常事务', custom: '自定义'
@@ -195,6 +204,15 @@ const TRANSLATIONS = {
             weekly: 'Weekly Momentum', distribution: 'Life Balance', topItems: 'Top Activities',
             days: 'days', items: 'items'
         },
+        calendar: {
+            exportTitle: 'Export to Calendar',
+            exportDesc: 'Generate .ics file for system calendar reminders',
+            exportBtn: 'Generate Calendar File',
+            exportSuccess: 'Calendar file generated, open to import',
+            noReminders: 'Please enable at least one reminder first',
+            iosTip: 'iOS: Select "Add to Calendar" in share menu',
+            androidTip: 'Android: Open with your calendar app'
+        },
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
             habits: 'Habits', mind: 'Mind', daily: 'Daily', custom: 'Custom'
@@ -208,6 +226,133 @@ const safeVibrate = (pattern: number[]) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
         try { navigator.vibrate(pattern); } catch (e) { /* silent fail */ }
     }
+};
+
+// 生成 ICS 日历文件并下载
+const generateICSFile = (settings: AppSettings, t: any) => {
+    const now = new Date();
+    const formatDate = (d: Date) => {
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+    
+    let events = '';
+    const uidBase = 'jiaqian-' + Date.now();
+    
+    // 1. 每日定点提醒事件
+    if (settings.reminders.fixedReminderEnabled) {
+        const [hour, min] = settings.reminders.fixedReminderTime.split(':').map(Number);
+        const dtstart = new Date(now);
+        dtstart.setHours(hour, min, 0, 0);
+        
+        // 如果设置时间已过，从明天开始
+        if (dtstart < now) {
+            dtstart.setDate(dtstart.getDate() + 1);
+        }
+        
+        events += `BEGIN:VEVENT
+UID:${uidBase}-fixed@jiaqian.app
+DTSTART;TZID=Asia/Shanghai:${formatDate(dtstart).replace('Z', '')}
+RRULE:FREQ=DAILY
+SUMMARY:${t.notif.dailyTitle}
+DESCRIPTION:${t.notif.dailyBody}
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:${t.notif.dailyTitle}
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+`;
+    }
+    
+    // 2. 打卡提醒事件（每小时检查一次，只在未打卡时提醒）
+    if (settings.reminders.checkInEnabled) {
+        // 在免打扰时段外设置提醒
+        const [dndStartHour, dndStartMin] = settings.reminders.dndStart.split(':').map(Number);
+        const [dndEndHour, dndEndMin] = settings.reminders.dndEnd.split(':').map(Number);
+        
+        // 设置几个关键时间点的提醒（早上、中午、下午、晚上）
+        const reminderTimes = [
+            { hour: 9, min: 0, label: 'morning' },
+            { hour: 12, min: 0, label: 'noon' },
+            { hour: 15, min: 0, label: 'afternoon' },
+            { hour: 18, min: 0, label: 'evening' }
+        ];
+        
+        reminderTimes.forEach((time, idx) => {
+            // 检查是否在免打扰时段
+            const timeInMinutes = time.hour * 60 + time.min;
+            const dndStartMinutes = dndStartHour * 60 + dndStartMin;
+            const dndEndMinutes = dndEndHour * 60 + dndEndMin;
+            
+            let isInDND = false;
+            if (dndStartMinutes < dndEndMinutes) {
+                isInDND = timeInMinutes >= dndStartMinutes && timeInMinutes <= dndEndMinutes;
+            } else {
+                // 跨午夜
+                isInDND = timeInMinutes >= dndStartMinutes || timeInMinutes <= dndEndMinutes;
+            }
+            
+            if (!isInDND) {
+                const dtstart = new Date(now);
+                dtstart.setHours(time.hour, time.min, 0, 0);
+                
+                if (dtstart < now) {
+                    dtstart.setDate(dtstart.getDate() + 1);
+                }
+                
+                events += `BEGIN:VEVENT
+UID:${uidBase}-checkin-${time.label}@jiaqian.app
+DTSTART;TZID=Asia/Shanghai:${formatDate(dtstart).replace('Z', '')}
+RRULE:FREQ=DAILY
+SUMMARY:${t.notif.title}
+DESCRIPTION:${t.notif.body}
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:${t.notif.title}
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+`;
+            }
+        });
+    }
+    
+    if (!events) {
+        alert(t.calendar?.noReminders || '请先开启至少一种提醒');
+        return false;
+    }
+    
+    const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//佳倩管家//打卡提醒//CN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:佳倩管家打卡提醒
+X-WR-TIMEZONE:Asia/Shanghai
+BEGIN:VTIMEZONE
+TZID:Asia/Shanghai
+X-LIC-LOCATION:Asia/Shanghai
+BEGIN:STANDARD
+TZOFFSETFROM:+0800
+TZOFFSETTO:+0800
+TZNAME:CST
+DTSTART:19700101T000000
+END:STANDARD
+END:VTIMEZONE
+${events}END:VCALENDAR`;
+    
+    // 下载文件
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `佳倩管家提醒_${now.toLocaleDateString('zh-CN')}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    return true;
 };
 
 // 通过 Service Worker 发送通知（支持后台推送）
@@ -940,6 +1085,38 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             <div className="setting-right"><input type="time" className="time-input-simple" value={settings.reminders.fixedReminderTime} onChange={e => updateReminders({ fixedReminderTime: e.target.value })} /></div>
                         </div>
                     )}
+                </div>
+
+                {/* 导出到系统日历 */}
+                <div className="settings-card-new">
+                    <div className="section-label">{t.calendar.exportTitle}</div>
+                    <div className="setting-row" style={{alignItems: 'flex-start'}}>
+                        <div className="setting-left" style={{flex: 1}}>
+                            <div className="icon-circle" style={{background: '#4CAF50'}}>📅</div>
+                            <div style={{flex: 1}}>
+                                <div className="setting-title">{t.calendar.exportTitle}</div>
+                                <div className="setting-desc">{t.calendar.exportDesc}</div>
+                                <div style={{marginTop: '8px', fontSize: '11px', color: 'var(--text-soft)', lineHeight: '1.5'}}>
+                                    💡 {settings.language === 'zh' ? t.calendar.iosTip : t.calendar.androidTip}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="setting-right">
+                            <button 
+                                className="setting-action-btn" 
+                                onClick={() => {
+                                    const success = generateICSFile(settings, t);
+                                    if (success) {
+                                        safeVibrate([50, 30, 50]);
+                                    }
+                                }}
+                                style={{background: settings.reminders.checkInEnabled || settings.reminders.fixedReminderEnabled ? '#4CAF50' : '#ccc', color: 'white'}}
+                                disabled={!settings.reminders.checkInEnabled && !settings.reminders.fixedReminderEnabled}
+                            >
+                                {t.calendar.exportBtn}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="settings-card-new">
