@@ -1732,5 +1732,88 @@ function MoodWall({ records, onClose, t }: { records: CheckInRecord[], onClose: 
     );
 }
 
+// 纪念日视图组件
+function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
+    const [showAdd, setShowAdd] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [newDate, setNewDate] = useState('');
+    const [newCat, setNewCat] = useState<'love' | 'birthday' | 'life' | 'goal'>('life');
+
+    const handleAdd = () => {
+        if (!newName || !newDate) return;
+        const item: Anniversary = { id: Math.random().toString(36).substr(2, 9), name: newName, date: newDate, category: newCat };
+        setAnniversaries([...anniversaries, item]);
+        setNewName(''); setNewDate(''); setNewCat('life');
+        setShowAdd(false);
+    };
+
+    const getDaysBetween = (target: string) => {
+        const d1 = new Date(target).getTime();
+        const d2 = new Date().setHours(0,0,0,0);
+        const diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+        return diff;
+    };
+
+    const catIcons = { love: '❤️', birthday: '🎂', life: '🌱', goal: '🎯' };
+    const catColors = { love: '#FFD7E2', birthday: '#FFF4D6', life: '#E5F6D3', goal: '#D6E9FF' };
+
+    return (
+        <div className="view">
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.anniv.title}</h2></div>
+            <div className="anniv-stats" style={{display:'flex', justifyContent:'space-between', padding:'0 20px 24px'}}>
+                <span style={{fontSize:'13px', fontWeight:'700', color:'var(--text-soft)'}}>已收录 {anniversaries.length} 个瞬间</span>
+                <button onClick={() => setShowAdd(true)} style={{fontSize:'13px', fontWeight:'850', color:'var(--accent)', background:'none', border:'none'}}>+ {t.anniv.add}</button>
+            </div>
+            <div className="anniv-list" style={{display:'flex', flexDirection:'column', gap:'16px', padding:'0 20px'}}>
+                {anniversaries.length === 0 ? 
+                    <div className="empty-state" style={{marginTop:'40px', textAlign:'center', color:'var(--text-soft)'}}>
+                        <div style={{fontSize:'48px', marginBottom:'12px'}}>🌱</div>
+                        <p>{t.anniv.empty}</p>
+                    </div> :
+                    anniversaries.map((a: Anniversary) => {
+                        const days = getDaysBetween(a.date);
+                        return (
+                            <div key={a.id} className="anniv-card-full">
+                                <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+                                    <div style={{width:'48px', height:'48px', borderRadius:'16px', background: catColors[a.category], display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px'}}>{catIcons[a.category]}</div>
+                                    <div><p style={{margin:0, fontWeight:'850', fontSize:'16px'}}>{a.name}</p><p style={{margin:'4px 0 0', fontSize:'12px', color:'var(--text-soft)', fontWeight:'600'}}>{a.date}</p></div>
+                                </div>
+                                <div style={{textAlign:'right'}}>
+                                    <p style={{margin:0, fontSize:'11px', color:'var(--text-soft)', fontWeight:'800'}}>{days >= 0 ? t.anniv.past : t.anniv.future}</p>
+                                    <p style={{margin:0, fontSize:'24px', fontWeight:'900', color: days >= 0 ? 'var(--accent)' : 'var(--blue)'}}>{Math.abs(days)}<span style={{fontSize:'12px', marginLeft:'2px'}}>{t.anniv.day}</span></p>
+                                    <button onClick={() => {if(confirm(t.anniv.confirmDel)) setAnniversaries(anniversaries.filter((it:any)=>it.id !== a.id))}} style={{color:'#FF3B30', fontSize:'10px', marginTop:'8px', fontWeight:'700', background:'none', border:'none'}}>{t.anniv.delete}</button>
+                                </div>
+                            </div>
+                        );
+                    })
+                }
+            </div>
+            {showAdd && (
+                <div className="drawer-overlay" onClick={() => setShowAdd(false)} style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.1)', zIndex:2000, display:'flex', alignItems:'flex-end'}}>
+                    <div className="drawer-content" onClick={e => e.stopPropagation()} style={{width:'100%', background:'white', borderTopLeftRadius:'40px', borderTopRightRadius:'40px', padding:'40px 24px'}}>
+                        <h3 style={{margin:'0 0 24px', fontSize:'18px', fontWeight:'850'}}>{t.anniv.add}</h3>
+                        
+                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'24px'}}>
+                            {Object.entries(t.anniv.cats).map(([key, label]: any) => (
+                                <button key={key} onClick={() => setNewCat(key)} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', border:'none', background:'none'}}>
+                                    <div style={{width:'56px', height:'56px', borderRadius:'18px', background: newCat === key ? catColors[key as keyof typeof catColors] : '#F4F4F7', border: newCat === key ? '2px solid var(--accent)' : '2px solid transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'24px', transition:'0.2s'}}>
+                                        {catIcons[key as keyof typeof catIcons]}
+                                    </div>
+                                    <span style={{fontSize:'11px', fontWeight:'800', color: newCat === key ? 'var(--text-main)' : 'var(--text-soft)'}}>{label}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder={t.anniv.name} className="time-input-simple" style={{width:'100%', marginBottom:'16px'}} />
+                        <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="time-input-simple" style={{width:'100%', marginBottom:'24px'}} />
+                        
+                        <button onClick={handleAdd} className="btn-confirm highlight" style={{width:'100%'}}>{t.complete} ✨</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(<App />);
