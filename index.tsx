@@ -179,7 +179,7 @@ const TRANSLATIONS = {
             noData: '暂无数据，请先导入账单',
             clearData: '清空数据',
             confirmClear: '确定要清空所有账单数据吗？'
-        }
+        },
         bill: {
             title: '账单导入',
             importTitle: '导入消费记录',
