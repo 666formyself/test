@@ -329,24 +329,27 @@ ${events}END:VCALENDAR`;
 
 
 
+// 精致图标组件
 const HomeIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
     </svg>
 );
 const CheckIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
-        <polyline points="20 6 9 17 4 12"/>
-    </svg>
-);
-const FoodIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
-        <path d="M12 20.94c1.88-1.55 3.94-3.08 5.61-4.78a9 9 0 1 0-11.22 0c1.67 1.7 3.73 3.23 5.61 4.78z"/><circle cx="12" cy="12" r="3"/>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
+        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>
     </svg>
 );
 const StatsIcon = ({ active }: { active: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
-        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
+        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+    </svg>
+);
+
+// 精致返回箭头
+const BackArrow = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
     </svg>
 );
 
@@ -1317,7 +1320,7 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
 
     return (
         <div className="view">
-            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.checkin}</h2></div>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn"><BackArrow /></button><h2>{t.checkin}</h2></div>
             <div className="subtab-container"><div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div><button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button><button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button></div>
             <div className="scroll-area-categories" style={{paddingBottom:'20px'}}>
                 {cats.map(c => ( 
@@ -1343,10 +1346,10 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
 }
 
 function StatsView({ t, statsData, setView, records }: any) {
-    if (!statsData) return <div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div><div className="empty-state" style={{marginTop:'100px'}}><p>{t.noRecords}</p></div></div>;
+    if (!statsData) return <div className="view"><div className="sub-header"><button onClick={() => setView('home')} className="back-btn"><BackArrow /></button><h2>{t.stats}</h2></div><div className="empty-state" style={{marginTop:'100px'}}><p>{t.noRecords}</p></div></div>;
     return (
         <div className="view">
-            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.stats}</h2></div>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn"><BackArrow /></button><h2>{t.stats}</h2></div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px', marginBottom:'24px'}}>
                 <div className="nav-card" style={{background:'var(--card-orange)'}}><span>{t.statLabels.streak}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{statsData.streak} {t.statLabels.days}</span></div>
                 <div className="nav-card" style={{background:'var(--card-blue)'}}><span>{t.statLabels.today}</span><span style={{fontSize:'24px', fontWeight:'900', marginTop:'4px'}}>{statsData.todayCount} {t.statLabels.items}</span></div>
@@ -1683,7 +1686,7 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
 
     return (
         <div className="view">
-            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn-square">⬅️</button><h2>{t.anniv.title}</h2></div>
+            <div className="sub-header"><button onClick={() => setView('home')} className="back-btn"><BackArrow /></button><h2>{t.anniv.title}</h2></div>
             <div className="anniv-stats" style={{display:'flex', justifyContent:'space-between', padding:'0 20px 24px'}}>
                 <span style={{fontSize:'13px', fontWeight:'700', color:'var(--text-soft)'}}>已收录 {anniversaries.length} 个瞬间</span>
                 <button onClick={() => setShowAdd(true)} style={{fontSize:'13px', fontWeight:'850', color:'var(--accent)', background:'none', border:'none'}}>+ {t.anniv.add}</button>
