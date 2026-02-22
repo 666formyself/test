@@ -2469,7 +2469,24 @@ function BillView({ t, setView }: any) {
             
             const records: BillRecord[] = [];
             console.log(`[Bill Import] Parsing ${source}, total rows:`, jsonData.length);
-            console.log('[Bill Import] Header row:', jsonData[0]);
+            
+            // 微信账单第一行是标题"微信支付账单明细列表"，第二行才是表头
+            // 支付宝也可能有类似情况，需要找到真正的表头行
+            let headerRowIdx = 0;
+            for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+                const row = jsonData[i];
+                if (row && row.some((cell: string) => 
+                    String(cell).includes('交易时间') || 
+                    String(cell).includes('交易对方') ||
+                    String(cell).includes('金额')
+                )) {
+                    headerRowIdx = i;
+                    break;
+                }
+            }
+            
+            console.log('[Bill Import] Header row index:', headerRowIdx);
+            console.log('[Bill Import] Header row:', jsonData[headerRowIdx]);
             
             // 打印前5行原始数据用于调试
             console.log('[Bill Import] First 5 rows:');
@@ -2478,7 +2495,7 @@ function BillView({ t, setView }: any) {
             }
             
             // 尝试自动检测列位置
-            const headerRow = jsonData[0] || [];
+            const headerRow = jsonData[headerRowIdx] || [];
             let dateCol = -1, merchantCol = -1, typeCol = -1, amountCol = -1;
             
             // 根据表头关键词检测列位置
@@ -2519,8 +2536,8 @@ function BillView({ t, setView }: any) {
                 if (amountCol === -1) amountCol = 9;
             }
             
-            // 跳过标题行，从第2行开始
-            for (let i = 1; i < jsonData.length; i++) {
+            // 从表头行的下一行开始读取数据
+            for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length < Math.max(dateCol, merchantCol, typeCol, amountCol) + 1) {
                     continue;
