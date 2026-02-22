@@ -451,6 +451,10 @@ function App() {
     const [showSuccess, setShowSuccess] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [activeFestival, setActiveFestival] = useState<'valentine' | 'newyear' | null>(null);
+    const [showShareCard, setShowShareCard] = useState(false);
+    const [todayNote, setTodayNote] = useState('');
+    const [showMoodWall, setShowMoodWall] = useState(false);
+    const [shareLink, setShareLink] = useState('');
     
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh',
@@ -593,23 +597,78 @@ function App() {
                 setPendingRecord(record);
                 setShowDuplicateConfirm(true);
                 if (settings.vibration) safeVibrate([30]);
-                try { triggerNotification(t.notif.title, (settings.language === 'zh' ? '检测到今日已记录相同项目，是否仍然添加？' : 'Detected same activity recorded today — add anyway?')); } catch (e) { }
                 return;
             }
 
             const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
             setRecords([newRecord, ...records]);
+            setTodayNote(record.note || '');
             setShowSuccess(true);
-            setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+            setTimeout(() => { 
+                setShowSuccess(false); 
+                setShowShareCard(true);
+                setSelectedItem(null); 
+            }, 1500);
             if (settings.vibration) safeVibrate([50]);
         } catch (e) {
             const newRecord: CheckInRecord = { ...record, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() };
             setRecords([newRecord, ...records]);
+            setTodayNote(record.note || '');
             setShowSuccess(true);
-            setTimeout(() => { setShowSuccess(false); setSelectedItem(null); setView('home'); }, 2200);
+            setTimeout(() => { 
+                setShowSuccess(false); 
+                setShowShareCard(true);
+                setSelectedItem(null); 
+            }, 1500);
             if (settings.vibration) safeVibrate([50]);
         }
     };
+
+    // 生成今日分享卡片数据
+    const generateShareCardData = () => {
+        const today = new Date().setHours(0,0,0,0);
+        const todayRecords = records.filter(r => new Date(r.timestamp).setHours(0,0,0,0) === today);
+        const todayMoods = todayRecords.map(r => r.note).filter(Boolean);
+        
+        return {
+            date: new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }),
+            count: todayRecords.length,
+            records: todayRecords.slice(0, 4),
+            moods: todayMoods,
+            streak: statsData?.streak || 0
+        };
+    };
+
+    // 生成共享链接
+    const generateShareLink = () => {
+        const data = {
+            records: records.slice(0, 30),
+            anniversaries,
+            generatedAt: Date.now()
+        };
+        const json = JSON.stringify(data);
+        const encoded = btoa(encodeURIComponent(json));
+        const url = `${window.location.origin}${window.location.pathname}#share=${encoded}`;
+        setShareLink(url);
+        navigator.clipboard.writeText(url);
+        alert('链接已复制到剪贴板，发给TA吧！❤️');
+    };
+
+    // 解析共享链接
+    useEffect(() => {
+        const hash = window.location.hash;
+        if (hash.startsWith('#share=')) {
+            try {
+                const encoded = hash.slice(7);
+                const json = decodeURIComponent(atob(encoded));
+                const data = JSON.parse(json);
+                // 可以在这里显示对方的记录
+                console.log('收到共享数据:', data);
+            } catch (e) {
+                console.error('解析分享链接失败');
+            }
+        }
+    }, []);
 
     // AI image upload handler removed (feature disabled)
 
@@ -638,7 +697,6 @@ function App() {
                         <div className="action-icon">👟</div>
                         <div className="action-label">{t.checkin}</div>
                     </div>
-                    {/* AI 热量功能已移除 */}
                     <div className="action-card h-card-3" onClick={() => setView('anniversary')}>
                         <div className="action-icon">❤️</div>
                         <div className="action-label">{t.anniversary}</div>
@@ -647,6 +705,22 @@ function App() {
                         <div className="action-icon">📊</div>
                         <div className="action-label">{t.stats}</div>
                     </div>
+                </div>
+
+                {/* 情侣功能快速入口 */}
+                <div className="couple-actions" style={{display: 'flex', gap: '12px', margin: '0 20px 20px'}}>
+                    <button 
+                        onClick={() => setShowMoodWall(true)}
+                        style={{flex: 1, padding: '14px', background: 'linear-gradient(135deg, #FFB6C1, #FF69B4)', border: 'none', borderRadius: '20px', color: 'white', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 15px rgba(255, 105, 180, 0.3)'}}
+                    >
+                        💌 {settings.language === 'zh' ? '今日心情' : 'Mood'}
+                    </button>
+                    <button 
+                        onClick={generateShareLink}
+                        style={{flex: 1, padding: '14px', background: 'linear-gradient(135deg, #87CEEB, #5AC8FA)', border: 'none', borderRadius: '20px', color: 'white', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 15px rgba(90, 200, 250, 0.3)'}}
+                    >
+                        🔗 {settings.language === 'zh' ? '分享给TA' : 'Share'}
+                    </button>
                 </div>
 
                 <section className="timeline-section">
@@ -698,6 +772,24 @@ function App() {
                 
                 {showSuccess && (
                     <div className="success-overlay"><span style={{fontSize:'80px', marginBottom:'20px'}}>✨</span><h1 style={{color:'var(--accent)'}}>{t.successMsg}</h1><p style={{color:'var(--text-soft)', fontWeight:'700'}}>{t.successSub}</p></div>
+                )}
+
+                {/* 分享卡片弹窗 */}
+                {showShareCard && (
+                    <ShareCard 
+                        data={generateShareCardData()} 
+                        onClose={() => setShowShareCard(false)}
+                        t={t}
+                    />
+                )}
+
+                {/* 心情墙弹窗 */}
+                {showMoodWall && (
+                    <MoodWall 
+                        records={records}
+                        onClose={() => setShowMoodWall(false)}
+                        t={t}
+                    />
                 )}
                 {showDuplicateConfirm && pendingRecord && (
                     <div className="modal-overlay" onClick={() => { setShowDuplicateConfirm(false); setPendingRecord(null); }}>
@@ -1381,6 +1473,259 @@ function StatsView({ t, statsData, setView, records }: any) {
                             );
                         }) : <div style={{color:'var(--text-soft)'}}>暂无分布数据</div>}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// 分享卡片组件
+function ShareCard({ data, onClose, t }: { data: any, onClose: () => void, t: any }) {
+    const cardRef = useRef<HTMLDivElement>(null);
+    
+    const handleDownload = () => {
+        // 模拟下载功能
+        alert('长按图片保存到相册，然后发给TA吧！❤️');
+    };
+    
+    return (
+        <div className="modal-overlay" onClick={onClose} style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)' }}>
+            <div 
+                ref={cardRef}
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: 'linear-gradient(135deg, #FF9671 0%, #FF6B9D 50%, #C44569 100%)',
+                    borderRadius: '24px',
+                    padding: '32px 28px',
+                    width: '90%',
+                    maxWidth: '360px',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}
+            >
+                {/* 装饰背景 */}
+                <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, opacity: 0.1 }}>❤️</div>
+                <div style={{ position: 'absolute', bottom: -30, left: -30, fontSize: 120, opacity: 0.08 }}>✨</div>
+                
+                {/* 日期 */}
+                <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.9)', fontSize: '13px', marginBottom: '8px' }}>
+                    {data.date}
+                </div>
+                
+                {/* 标题 */}
+                <h2 style={{ 
+                    textAlign: 'center', 
+                    color: 'white', 
+                    margin: '0 0 20px',
+                    fontSize: '22px',
+                    fontWeight: '800',
+                    textShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                }}>
+                    今日打卡完成 ✨
+                </h2>
+                
+                {/* 连续打卡 */}
+                <div style={{ 
+                    textAlign: 'center', 
+                    background: 'rgba(255,255,255,0.2)', 
+                    borderRadius: '16px',
+                    padding: '12px 20px',
+                    marginBottom: '20px',
+                    backdropFilter: 'blur(10px)'
+                }}>
+                    <span style={{ color: 'white', fontSize: '14px' }}>已连续打卡 </span>
+                    <span style={{ color: 'white', fontSize: '32px', fontWeight: '900' }}>{data.streak}</span>
+                    <span style={{ color: 'white', fontSize: '14px' }}> 天</span>
+                </div>
+                
+                {/* 打卡项目 */}
+                <div style={{ marginBottom: '20px' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', marginBottom: '12px' }}>今日完成 {data.count} 项：</p>
+                    {data.records.map((record: any, idx: number) => (
+                        <div key={idx} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px',
+                            background: 'rgba(255,255,255,0.15)',
+                            padding: '10px 14px',
+                            borderRadius: '12px',
+                            marginBottom: '8px'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>
+                                {record.activityType === 'wakeup' ? '🌅' : record.type === 'sport' ? '💪' : '📝'}
+                            </span>
+                            <span style={{ color: 'white', fontSize: '15px', fontWeight: '600', flex: 1 }}>
+                                {record.name}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                
+                {/* 心情语录 */}
+                {data.moods.length > 0 && (
+                    <div style={{ 
+                        background: 'rgba(255,255,255,0.25)', 
+                        borderRadius: '16px',
+                        padding: '16px',
+                        marginBottom: '20px',
+                        border: '1px solid rgba(255,255,255,0.3)'
+                    }}>
+                        <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: '0 0 6px' }}>💭 今日心情</p>
+                        <p style={{ color: 'white', fontSize: '15px', margin: 0, fontStyle: 'italic', lineHeight: 1.5 }}>
+                            "{data.moods[0]}"
+                        </p>
+                    </div>
+                )}
+                
+                {/* 底部 */}
+                <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                    来自 佳倩管家 💕
+                </div>
+                
+                {/* 操作按钮 */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                    <button 
+                        onClick={handleDownload}
+                        style={{
+                            flex: 1,
+                            padding: '14px',
+                            background: 'white',
+                            border: 'none',
+                            borderRadius: '14px',
+                            color: '#FF6B9D',
+                            fontWeight: '800',
+                            fontSize: '15px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        📸 保存分享
+                    </button>
+                    <button 
+                        onClick={onClose}
+                        style={{
+                            flex: 1,
+                            padding: '14px',
+                            background: 'rgba(255,255,255,0.2)',
+                            border: 'none',
+                            borderRadius: '14px',
+                            color: 'white',
+                            fontWeight: '700',
+                            fontSize: '15px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// 心情墙组件
+function MoodWall({ records, onClose, t }: { records: CheckInRecord[], onClose: () => void, t: any }) {
+    // 获取最近7天有心情的记录
+    const recordsWithMood = useMemo(() => {
+        return records
+            .filter(r => r.note && r.note.trim())
+            .slice(0, 20);
+    }, [records]);
+    
+    return (
+        <div className="drawer-overlay" onClick={onClose} style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)' }}>
+            <div 
+                onClick={e => e.stopPropagation()}
+                style={{
+                    width: '100%',
+                    maxWidth: '420px',
+                    height: '80vh',
+                    background: 'var(--bg-color)',
+                    borderRadius: '32px 32px 0 0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                }}
+            >
+                {/* 头部 */}
+                <div style={{ 
+                    padding: '24px 20px 16px', 
+                    borderBottom: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800' }}>💌 心情日记</h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-soft)' }}>
+                            {recordsWithMood.length} 条心情记录
+                        </p>
+                    </div>
+                    <button 
+                        onClick={onClose}
+                        style={{ 
+                            width: '36px', 
+                            height: '36px', 
+                            borderRadius: '50%', 
+                            border: 'none',
+                            background: 'var(--card-bg)',
+                            fontSize: '20px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+                
+                {/* 心情列表 */}
+                <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+                    {recordsWithMood.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-soft)' }}>
+                            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📝</div>
+                            <p>还没有心情记录</p>
+                            <p style={{ fontSize: '13px' }}>打卡时写下感受，记录美好瞬间</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {recordsWithMood.map((record, idx) => (
+                                <div 
+                                    key={record.id}
+                                    style={{
+                                        background: 'var(--card-bg)',
+                                        borderRadius: '20px',
+                                        padding: '16px',
+                                        boxShadow: 'var(--shadow-soft)',
+                                        border: '1px solid var(--border-color)'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                        <span style={{ fontSize: '24px' }}>
+                                            {record.activityType === 'wakeup' ? '🌅' : record.type === 'sport' ? '💪' : '📝'}
+                                        </span>
+                                        <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>
+                                            {record.name}
+                                        </span>
+                                        <span style={{ 
+                                            marginLeft: 'auto', 
+                                            fontSize: '12px', 
+                                            color: 'var(--text-soft)'
+                                        }}>
+                                            {new Date(record.timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                    </div>
+                                    <p style={{ 
+                                        margin: 0, 
+                                        fontSize: '15px', 
+                                        lineHeight: 1.6, 
+                                        color: 'var(--text-main)',
+                                        paddingLeft: '34px'
+                                    }}>
+                                        "{record.note}"
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
