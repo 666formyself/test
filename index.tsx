@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
+import * as XLSX from 'xlsx';
 
 // --- Types ---
 type ActivityType = 'cardio' | 'strength' | 'flexibility' | 'habit' | 'mind' | 'daily' | 'wakeup' | 'general' | 'rope';
@@ -155,43 +156,15 @@ const TRANSLATIONS = {
         bill: {
             title: '账单导入',
             importTitle: '导入消费记录',
-            importDesc: '从微信/支付宝导出账单，导入分析',
+            importDesc: '从微信/支付宝导出账单，导入分析（支持CSV/Excel）',
             howToExport: '如何导出账单',
             wechatGuide: '微信账单导出指南',
             alipayGuide: '支付宝账单导出指南',
             step1: '1. 打开微信 → 我 → 服务 → 钱包 → 账单',
             step2: '2. 点击右上角"常见问题" → 下载账单',
-            step3: '3. 选择"用于个人对账"，导出CSV格式',
+            step3: '3. 选择"用于个人对账"，导出CSV或Excel格式',
             step4: '4. 将文件发送到手机，在下方选择导入',
-            selectFile: '选择账单文件',
-            parseSuccess: '成功导入 {count} 条记录',
-            parseError: '文件解析失败，请检查格式',
-            totalAmount: '总消费',
-            recordCount: '记录数',
-            avgAmount: '平均消费',
-            categoryStats: '消费分类',
-            monthlyTrend: '月度趋势',
-            topMerchants: '消费最多商家',
-            date: '日期',
-            merchant: '商家',
-            category: '类别',
-            amount: '金额',
-            noData: '暂无数据，请先导入账单',
-            clearData: '清空数据',
-            confirmClear: '确定要清空所有账单数据吗？'
-        },
-        bill: {
-            title: '账单导入',
-            importTitle: '导入消费记录',
-            importDesc: '从微信/支付宝导出账单，导入分析',
-            howToExport: '如何导出账单',
-            wechatGuide: '微信账单导出指南',
-            alipayGuide: '支付宝账单导出指南',
-            step1: '1. 打开微信 → 我 → 服务 → 钱包 → 账单',
-            step2: '2. 点击右上角"常见问题" → 下载账单',
-            step3: '3. 选择"用于个人对账"，导出CSV格式',
-            step4: '4. 将文件发送到手机，在下方选择导入',
-            selectFile: '选择账单文件',
+            selectFile: '选择账单文件 (CSV/Excel)',
             parseSuccess: '成功导入 {count} 条记录',
             parseError: '文件解析失败，请检查格式',
             totalAmount: '总消费',
@@ -327,43 +300,15 @@ const TRANSLATIONS = {
         bill: {
             title: 'Bill Import',
             importTitle: 'Import Expenses',
-            importDesc: 'Export bills from WeChat/Alipay and analyze',
+            importDesc: 'Export bills from WeChat/Alipay and analyze (CSV/Excel)',
             howToExport: 'How to Export',
             wechatGuide: 'WeChat Bill Guide',
             alipayGuide: 'Alipay Bill Guide',
             step1: '1. Open WeChat → Me → Services → Wallet → Bills',
             step2: '2. Tap FAQ → Download Bills',
-            step3: '3. Select "Personal Record", export CSV',
+            step3: '3. Select "Personal Record", export CSV/Excel',
             step4: '4. Send file to phone, import below',
-            selectFile: 'Select Bill File',
-            parseSuccess: 'Imported {count} records',
-            parseError: 'Parse failed, check file format',
-            totalAmount: 'Total Spent',
-            recordCount: 'Records',
-            avgAmount: 'Average',
-            categoryStats: 'Categories',
-            monthlyTrend: 'Monthly Trend',
-            topMerchants: 'Top Merchants',
-            date: 'Date',
-            merchant: 'Merchant',
-            category: 'Category',
-            amount: 'Amount',
-            noData: 'No data, please import bills first',
-            clearData: 'Clear Data',
-            confirmClear: 'Clear all bill data?'
-        },
-        bill: {
-            title: 'Bill Import',
-            importTitle: 'Import Expenses',
-            importDesc: 'Export bills from WeChat/Alipay and analyze',
-            howToExport: 'How to Export',
-            wechatGuide: 'WeChat Bill Guide',
-            alipayGuide: 'Alipay Bill Guide',
-            step1: '1. Open WeChat → Me → Services → Wallet → Bills',
-            step2: '2. Tap FAQ → Download Bills',
-            step3: '3. Select "Personal Record", export CSV',
-            step4: '4. Send file to phone, import below',
-            selectFile: 'Select Bill File',
+            selectFile: 'Select Bill File (CSV/Excel)',
             parseSuccess: 'Imported {count} records',
             parseError: 'Parse failed, check file format',
             totalAmount: 'Total Spent',
@@ -2589,25 +2534,107 @@ function BillView({ t, setView }: any) {
         return '其他';
     };
 
+    // 解析XLSX文件
+    const parseXLSX = (data: ArrayBuffer, source: 'wechat' | 'alipay'): BillRecord[] => {
+        try {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 });
+            
+            const records: BillRecord[] = [];
+            // 跳过标题行
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length < 5) continue;
+                
+                try {
+                    if (source === 'wechat') {
+                        // 微信格式：交易时间,交易类型,交易对方,商品,收/支,金额(元)...
+                        const date = String(row[0] || '').trim();
+                        const merchant = String(row[2] || '').trim();
+                        const type = String(row[4] || '').trim() === '收入' ? 'income' : 'expense';
+                        const amountStr = String(row[5] || '').replace('¥', '').trim();
+                        const amount = parseFloat(amountStr) || 0;
+                        
+                        if (date && merchant && amount > 0) {
+                            records.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                date: date.split(' ')[0],
+                                merchant,
+                                category: guessCategory(merchant),
+                                amount,
+                                type,
+                                source
+                            });
+                        }
+                    } else {
+                        // 支付宝格式：交易号,商家订单号,交易创建时间...交易对方,商品名称,金额（元）,收/支...
+                        const date = String(row[2] || '').trim();
+                        const merchant = String(row[7] || '').trim();
+                        const type = String(row[10] || '').trim() === '收入' ? 'income' : 'expense';
+                        const amountStr = String(row[9] || '').trim();
+                        const amount = parseFloat(amountStr) || 0;
+                        
+                        if (date && merchant && amount > 0) {
+                            records.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                date: date.split(' ')[0],
+                                merchant,
+                                category: guessCategory(merchant),
+                                amount,
+                                type,
+                                source
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error('Parse row error:', e);
+                }
+            }
+            return records;
+        } catch (e) {
+            console.error('XLSX parse error:', e);
+            return [];
+        }
+    };
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         
         setImporting(true);
+        const isXLSX = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+        
         const reader = new FileReader();
         
         reader.onload = (event) => {
-            const content = event.target?.result as string;
-            if (!content) {
-                alert(t.bill?.parseError || '解析失败');
-                setImporting(false);
-                return;
+            let newRecords: BillRecord[] = [];
+            
+            if (isXLSX) {
+                // XLSX 文件处理
+                const data = event.target?.result as ArrayBuffer;
+                if (!data) {
+                    alert(t.bill?.parseError || '解析失败');
+                    setImporting(false);
+                    return;
+                }
+                // 检测来源（微信/支付宝）- 通过读取部分文本判断
+                const textSample = new TextDecoder().decode(data.slice(0, 2000));
+                const source: 'wechat' | 'alipay' = textSample.includes('微信') || textSample.includes('WeChat') ? 'wechat' : 'alipay';
+                newRecords = parseXLSX(data, source);
+            } else {
+                // CSV 文件处理
+                const content = event.target?.result as string;
+                if (!content) {
+                    alert(t.bill?.parseError || '解析失败');
+                    setImporting(false);
+                    return;
+                }
+                // 检测是微信还是支付宝
+                const source: 'wechat' | 'alipay' = content.includes('微信') || content.includes('WeChat') ? 'wechat' : 'alipay';
+                newRecords = parseCSV(content, source);
             }
             
-            // 检测是微信还是支付宝
-            const source: 'wechat' | 'alipay' = content.includes('微信') || content.includes('WeChat') ? 'wechat' : 'alipay';
-            
-            const newRecords = parseCSV(content, source);
             if (newRecords.length > 0) {
                 setBillRecords(prev => [...newRecords, ...prev]);
                 alert((t.bill?.parseSuccess || '成功导入 {count} 条记录').replace('{count}', String(newRecords.length)));
@@ -2618,7 +2645,11 @@ function BillView({ t, setView }: any) {
             setImporting(false);
         };
         
-        reader.readAsText(file, 'utf-8');
+        if (isXLSX) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file, 'utf-8');
+        }
     };
 
     const clearData = () => {
@@ -2699,7 +2730,7 @@ function BillView({ t, setView }: any) {
                             <input
                                 type="file"
                                 ref={fileInputRef}
-                                accept=".csv,.xlsx,.xls"
+                                accept=".csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                 style={{ display: 'none' }}
                                 onChange={handleFileSelect}
                             />
