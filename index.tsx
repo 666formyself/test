@@ -455,9 +455,6 @@ function App() {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [activeFestival, setActiveFestival] = useState<'valentine' | 'newyear' | null>(null);
     const [showShareCard, setShowShareCard] = useState(false);
-    const [todayNote, setTodayNote] = useState('');
-    const [showMoodWall, setShowMoodWall] = useState(false);
-    const [shareLink, setShareLink] = useState('');
     
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh',
@@ -642,36 +639,7 @@ function App() {
         };
     };
 
-    // 生成共享链接
-    const generateShareLink = () => {
-        const data = {
-            records: records.slice(0, 30),
-            anniversaries,
-            generatedAt: Date.now()
-        };
-        const json = JSON.stringify(data);
-        const encoded = btoa(encodeURIComponent(json));
-        const url = `${window.location.origin}${window.location.pathname}#share=${encoded}`;
-        setShareLink(url);
-        navigator.clipboard.writeText(url);
-        alert('链接已复制到剪贴板，发给TA吧！❤️');
-    };
 
-    // 解析共享链接
-    useEffect(() => {
-        const hash = window.location.hash;
-        if (hash.startsWith('#share=')) {
-            try {
-                const encoded = hash.slice(7);
-                const json = decodeURIComponent(atob(encoded));
-                const data = JSON.parse(json);
-                // 可以在这里显示对方的记录
-                console.log('收到共享数据:', data);
-            } catch (e) {
-                console.error('解析分享链接失败');
-            }
-        }
-    }, []);
 
     // AI image upload handler removed (feature disabled)
 
@@ -710,21 +678,7 @@ function App() {
                     </div>
                 </div>
 
-                {/* 情侣功能快速入口 */}
-                <div className="couple-actions" style={{display: 'flex', gap: '12px', margin: '0 20px 20px'}}>
-                    <button 
-                        onClick={() => setShowMoodWall(true)}
-                        style={{flex: 1, padding: '14px', background: 'linear-gradient(135deg, #FFB6C1, #FF69B4)', border: 'none', borderRadius: '20px', color: 'white', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 15px rgba(255, 105, 180, 0.3)'}}
-                    >
-                        💌 {settings.language === 'zh' ? '今日心情' : 'Mood'}
-                    </button>
-                    <button 
-                        onClick={generateShareLink}
-                        style={{flex: 1, padding: '14px', background: 'linear-gradient(135deg, #87CEEB, #5AC8FA)', border: 'none', borderRadius: '20px', color: 'white', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 15px rgba(90, 200, 250, 0.3)'}}
-                    >
-                        🔗 {settings.language === 'zh' ? '分享给TA' : 'Share'}
-                    </button>
-                </div>
+
 
                 <section className="timeline-section">
                     <div className="section-header">
@@ -782,15 +736,6 @@ function App() {
                     <ShareCard 
                         data={generateShareCardData()} 
                         onClose={() => setShowShareCard(false)}
-                        t={t}
-                    />
-                )}
-
-                {/* 心情墙弹窗 */}
-                {showMoodWall && (
-                    <MoodWall 
-                        records={records}
-                        onClose={() => setShowMoodWall(false)}
                         t={t}
                     />
                 )}
@@ -1544,115 +1489,6 @@ function ShareCard({ data, onClose, t }: { data: any, onClose: () => void, t: an
                     >
                         关闭
                     </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// 心情墙组件
-function MoodWall({ records, onClose, t }: { records: CheckInRecord[], onClose: () => void, t: any }) {
-    // 获取最近7天有心情的记录
-    const recordsWithMood = useMemo(() => {
-        return records
-            .filter(r => r.note && r.note.trim())
-            .slice(0, 20);
-    }, [records]);
-    
-    return (
-        <div className="drawer-overlay" onClick={onClose} style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)' }}>
-            <div 
-                onClick={e => e.stopPropagation()}
-                style={{
-                    width: '100%',
-                    maxWidth: '420px',
-                    height: '80vh',
-                    background: 'var(--bg-color)',
-                    borderRadius: '32px 32px 0 0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                }}
-            >
-                {/* 头部 */}
-                <div style={{ 
-                    padding: '24px 20px 16px', 
-                    borderBottom: '1px solid var(--border-color)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    <div>
-                        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800' }}>💌 心情日记</h2>
-                        <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-soft)' }}>
-                            {recordsWithMood.length} 条心情记录
-                        </p>
-                    </div>
-                    <button 
-                        onClick={onClose}
-                        style={{ 
-                            width: '36px', 
-                            height: '36px', 
-                            borderRadius: '50%', 
-                            border: 'none',
-                            background: 'var(--card-bg)',
-                            fontSize: '20px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        ✕
-                    </button>
-                </div>
-                
-                {/* 心情列表 */}
-                <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-                    {recordsWithMood.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-soft)' }}>
-                            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📝</div>
-                            <p>还没有心情记录</p>
-                            <p style={{ fontSize: '13px' }}>打卡时写下感受，记录美好瞬间</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {recordsWithMood.map((record, idx) => (
-                                <div 
-                                    key={record.id}
-                                    style={{
-                                        background: 'var(--card-bg)',
-                                        borderRadius: '20px',
-                                        padding: '16px',
-                                        boxShadow: 'var(--shadow-soft)',
-                                        border: '1px solid var(--border-color)'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                                        <span style={{ fontSize: '24px' }}>
-                                            {record.activityType === 'wakeup' ? '🌅' : record.type === 'sport' ? '💪' : '📝'}
-                                        </span>
-                                        <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>
-                                            {record.name}
-                                        </span>
-                                        <span style={{ 
-                                            marginLeft: 'auto', 
-                                            fontSize: '12px', 
-                                            color: 'var(--text-soft)'
-                                        }}>
-                                            {new Date(record.timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-                                        </span>
-                                    </div>
-                                    <p style={{ 
-                                        margin: 0, 
-                                        fontSize: '15px', 
-                                        lineHeight: 1.6, 
-                                        color: 'var(--text-main)',
-                                        paddingLeft: '34px'
-                                    }}>
-                                        "{record.note}"
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
             </div>
         </div>
