@@ -183,6 +183,7 @@ body {
 .h-card-3 { background: var(--card-pink); }
 .h-card-4 { background: var(--card-blue); }
 .h-card-chef { background: linear-gradient(135deg, #FFE5B4 0%, #FFD4A3 100%); }
+.h-card-bill { background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); }
 
 .action-icon { font-size: 32px; }
 

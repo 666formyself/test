@@ -56,6 +56,17 @@ interface Anniversary {
     category: 'love' | 'birthday' | 'life' | 'goal';
 }
 
+// 账单记录类型
+interface BillRecord {
+    id: string;
+    date: string;
+    merchant: string;
+    category: string;
+    amount: number;
+    type: 'expense' | 'income';
+    source: 'wechat' | 'alipay';
+}
+
 const TRANSLATIONS = {
     zh: {
         home: '主页', checkin: '打卡', calories: '热量', stats: '统计',
@@ -141,6 +152,60 @@ const TRANSLATIONS = {
             reminderName: '打卡名称',
             reminderTime: '提醒时间'
         },
+        bill: {
+            title: '账单导入',
+            importTitle: '导入消费记录',
+            importDesc: '从微信/支付宝导出账单，导入分析',
+            howToExport: '如何导出账单',
+            wechatGuide: '微信账单导出指南',
+            alipayGuide: '支付宝账单导出指南',
+            step1: '1. 打开微信 → 我 → 服务 → 钱包 → 账单',
+            step2: '2. 点击右上角"常见问题" → 下载账单',
+            step3: '3. 选择"用于个人对账"，导出CSV格式',
+            step4: '4. 将文件发送到手机，在下方选择导入',
+            selectFile: '选择账单文件',
+            parseSuccess: '成功导入 {count} 条记录',
+            parseError: '文件解析失败，请检查格式',
+            totalAmount: '总消费',
+            recordCount: '记录数',
+            avgAmount: '平均消费',
+            categoryStats: '消费分类',
+            monthlyTrend: '月度趋势',
+            topMerchants: '消费最多商家',
+            date: '日期',
+            merchant: '商家',
+            category: '类别',
+            amount: '金额',
+            noData: '暂无数据，请先导入账单',
+            clearData: '清空数据',
+            confirmClear: '确定要清空所有账单数据吗？'
+        }
+        bill: {
+            title: '账单导入',
+            importTitle: '导入消费记录',
+            importDesc: '从微信/支付宝导出账单，导入分析',
+            howToExport: '如何导出账单',
+            wechatGuide: '微信账单导出指南',
+            alipayGuide: '支付宝账单导出指南',
+            step1: '1. 打开微信 → 我 → 服务 → 钱包 → 账单',
+            step2: '2. 点击右上角"常见问题" → 下载账单',
+            step3: '3. 选择"用于个人对账"，导出CSV格式',
+            step4: '4. 将文件发送到手机，在下方选择导入',
+            selectFile: '选择账单文件',
+            parseSuccess: '成功导入 {count} 条记录',
+            parseError: '文件解析失败，请检查格式',
+            totalAmount: '总消费',
+            recordCount: '记录数',
+            avgAmount: '平均消费',
+            categoryStats: '消费分类',
+            monthlyTrend: '月度趋势',
+            topMerchants: '消费最多商家',
+            date: '日期',
+            merchant: '商家',
+            category: '类别',
+            amount: '金额',
+            noData: '暂无数据，请先导入账单'
+        }
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
             habits: '自律习惯', mind: '精神寄托', daily: '日常事务', custom: '自定义'
@@ -258,6 +323,60 @@ const TRANSLATIONS = {
             deleteReminder: 'Delete',
             reminderName: 'Reminder Name',
             reminderTime: 'Reminder Time'
+        },
+        bill: {
+            title: 'Bill Import',
+            importTitle: 'Import Expenses',
+            importDesc: 'Export bills from WeChat/Alipay and analyze',
+            howToExport: 'How to Export',
+            wechatGuide: 'WeChat Bill Guide',
+            alipayGuide: 'Alipay Bill Guide',
+            step1: '1. Open WeChat → Me → Services → Wallet → Bills',
+            step2: '2. Tap FAQ → Download Bills',
+            step3: '3. Select "Personal Record", export CSV',
+            step4: '4. Send file to phone, import below',
+            selectFile: 'Select Bill File',
+            parseSuccess: 'Imported {count} records',
+            parseError: 'Parse failed, check file format',
+            totalAmount: 'Total Spent',
+            recordCount: 'Records',
+            avgAmount: 'Average',
+            categoryStats: 'Categories',
+            monthlyTrend: 'Monthly Trend',
+            topMerchants: 'Top Merchants',
+            date: 'Date',
+            merchant: 'Merchant',
+            category: 'Category',
+            amount: 'Amount',
+            noData: 'No data, please import bills first',
+            clearData: 'Clear Data',
+            confirmClear: 'Clear all bill data?'
+        },
+        bill: {
+            title: 'Bill Import',
+            importTitle: 'Import Expenses',
+            importDesc: 'Export bills from WeChat/Alipay and analyze',
+            howToExport: 'How to Export',
+            wechatGuide: 'WeChat Bill Guide',
+            alipayGuide: 'Alipay Bill Guide',
+            step1: '1. Open WeChat → Me → Services → Wallet → Bills',
+            step2: '2. Tap FAQ → Download Bills',
+            step3: '3. Select "Personal Record", export CSV',
+            step4: '4. Send file to phone, import below',
+            selectFile: 'Select Bill File',
+            parseSuccess: 'Imported {count} records',
+            parseError: 'Parse failed, check file format',
+            totalAmount: 'Total Spent',
+            recordCount: 'Records',
+            avgAmount: 'Average',
+            categoryStats: 'Categories',
+            monthlyTrend: 'Monthly Trend',
+            topMerchants: 'Top Merchants',
+            date: 'Date',
+            merchant: 'Merchant',
+            category: 'Category',
+            amount: 'Amount',
+            noData: 'No data, please import bills first'
         },
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
@@ -563,7 +682,7 @@ const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, on
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
-    const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary' | 'chef'>('home');
+    const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary' | 'chef' | 'bill'>('home');
     const [showDailyQuote, setShowDailyQuote] = useState(false);
     const [dailyQuote, setDailyQuote] = useState<{text: string, author?: string, isSpecial?: boolean, type?: 'festival' | 'anniversary'} | null>(null);
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
@@ -843,7 +962,7 @@ function App() {
                 
                 <Clock lang={settings.language} />
 
-                <div className="home-action-grid" style={{gridTemplateColumns: 'repeat(2, 1fr)'}}>
+                <div className="home-action-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
                     <div className="action-card h-card-1" onClick={() => setView('checkin')}>
                         <div className="action-icon">👟</div>
                         <div className="action-label">{t.checkin}</div>
@@ -859,6 +978,10 @@ function App() {
                     <div className="action-card h-card-chef" onClick={() => setView('chef')}>
                         <div className="action-icon">🍳</div>
                         <div className="action-label">{t.chef?.title || '佳倩小厨'}</div>
+                    </div>
+                    <div className="action-card h-card-bill" onClick={() => setView('bill')}>
+                        <div className="action-icon">💰</div>
+                        <div className="action-label">{t.bill?.title || '账单导入'}</div>
                     </div>
                 </div>
 
@@ -964,6 +1087,7 @@ function App() {
                     {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                     {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
                     {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
+                    {view === 'bill' && <BillView t={t} setView={setView} />}
                     {view === 'chef' && <ChefView t={t} setView={setView} />}
                 </main>
                 <nav className="bottom-nav">
@@ -2370,6 +2494,337 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// 账单导入组件
+function BillView({ t, setView }: any) {
+    const [billRecords, setBillRecords] = useState<BillRecord[]>(() => {
+        const saved = localStorage.getItem('jq_bills');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [activeTab, setActiveTab] = useState<'import' | 'stats' | 'list'>('import');
+    const [importing, setImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // 保存到 localStorage
+    useEffect(() => {
+        localStorage.setItem('jq_bills', JSON.stringify(billRecords));
+    }, [billRecords]);
+
+    // 解析CSV文件
+    const parseCSV = (content: string, source: 'wechat' | 'alipay'): BillRecord[] => {
+        const lines = content.split('\n').filter(line => line.trim());
+        const records: BillRecord[] = [];
+        
+        // 跳过标题行
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            const parts = line.split(',');
+            
+            try {
+                if (source === 'wechat') {
+                    // 微信格式：交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注
+                    const date = parts[0]?.trim();
+                    const merchant = parts[2]?.trim();
+                    const type = parts[4]?.trim() === '收入' ? 'income' : 'expense';
+                    const amountStr = parts[5]?.replace('¥', '').trim();
+                    const amount = parseFloat(amountStr) || 0;
+                    
+                    if (date && merchant && amount > 0) {
+                        records.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            date: date.split(' ')[0],
+                            merchant,
+                            category: guessCategory(merchant),
+                            amount,
+                            type,
+                            source
+                        });
+                    }
+                } else {
+                    // 支付宝格式：交易号,商家订单号,交易创建时间,付款时间,最近修改时间,交易来源地,类型,交易对方,商品名称,金额（元）,收/支,交易状态,服务费（元）,成功退款（元）,备注,资金状态
+                    const date = parts[2]?.trim();
+                    const merchant = parts[7]?.trim();
+                    const type = parts[10]?.trim() === '收入' ? 'income' : 'expense';
+                    const amountStr = parts[9]?.trim();
+                    const amount = parseFloat(amountStr) || 0;
+                    
+                    if (date && merchant && amount > 0) {
+                        records.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            date: date.split(' ')[0],
+                            merchant,
+                            category: guessCategory(merchant),
+                            amount,
+                            type,
+                            source
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Parse error:', e);
+            }
+        }
+        
+        return records;
+    };
+
+    // 根据商家名称猜测类别
+    const guessCategory = (merchant: string): string => {
+        const categories: Record<string, string[]> = {
+            '餐饮': ['餐厅', '饭店', '火锅', '烧烤', '奶茶', '咖啡', '肯德基', '麦当劳', '必胜客', '星巴克', '瑞幸', '美食', '小吃', '面馆', '饺子', '寿司', '料理'],
+            '购物': ['超市', '便利店', '商场', '百货', '淘宝', '京东', '拼多多', '天猫', '唯品会', '超市', '沃尔玛', '家乐福'],
+            '交通': ['地铁', '公交', '打车', '滴滴', '出租车', '加油', '停车', '高铁', '火车', '机票'],
+            '娱乐': ['电影', 'KTV', '游戏', '充值', '会员', '视频', '音乐', '书店', '网吧'],
+            '生活': ['水电', '煤气', '物业', '房租', '宽带', '话费', '快递', '洗衣', '理发'],
+            '医疗': ['医院', '药店', '诊所', '体检'],
+            '教育': ['培训', '课程', '学费', '书本', '教材']
+        };
+        
+        for (const [cat, keywords] of Object.entries(categories)) {
+            if (keywords.some(k => merchant.includes(k))) return cat;
+        }
+        return '其他';
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setImporting(true);
+        const reader = new FileReader();
+        
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            if (!content) {
+                alert(t.bill?.parseError || '解析失败');
+                setImporting(false);
+                return;
+            }
+            
+            // 检测是微信还是支付宝
+            const source: 'wechat' | 'alipay' = content.includes('微信') || content.includes('WeChat') ? 'wechat' : 'alipay';
+            
+            const newRecords = parseCSV(content, source);
+            if (newRecords.length > 0) {
+                setBillRecords(prev => [...newRecords, ...prev]);
+                alert((t.bill?.parseSuccess || '成功导入 {count} 条记录').replace('{count}', String(newRecords.length)));
+                setActiveTab('stats');
+            } else {
+                alert(t.bill?.parseError || '未找到有效记录');
+            }
+            setImporting(false);
+        };
+        
+        reader.readAsText(file, 'utf-8');
+    };
+
+    const clearData = () => {
+        if (confirm(t.bill?.confirmClear || '确定清空？')) {
+            setBillRecords([]);
+            localStorage.removeItem('jq_bills');
+        }
+    };
+
+    // 统计数据
+    const stats = useMemo(() => {
+        const expenses = billRecords.filter(r => r.type === 'expense');
+        const total = expenses.reduce((sum, r) => sum + r.amount, 0);
+        const avg = expenses.length > 0 ? total / expenses.length : 0;
+        
+        // 按类别统计
+        const byCategory: Record<string, number> = {};
+        expenses.forEach(r => {
+            byCategory[r.category] = (byCategory[r.category] || 0) + r.amount;
+        });
+        
+        // 按月份统计
+        const byMonth: Record<string, number> = {};
+        expenses.forEach(r => {
+            const month = r.date.substring(0, 7);
+            byMonth[month] = (byMonth[month] || 0) + r.amount;
+        });
+        
+        // 消费最多的商家
+        const byMerchant: Record<string, number> = {};
+        expenses.forEach(r => {
+            byMerchant[r.merchant] = (byMerchant[r.merchant] || 0) + r.amount;
+        });
+        const topMerchants = Object.entries(byMerchant)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+        
+        return { total, avg, byCategory, byMonth, topMerchants, count: expenses.length };
+    }, [billRecords]);
+
+    return (
+        <div className="view">
+            <div className="sub-header">
+                <button onClick={() => setView('home')} className="back-btn"><BackArrow /></button>
+                <h2>💰 {t.bill?.title || '账单导入'}</h2>
+            </div>
+
+            {/* Tab 切换 */}
+            <div className="subtab-container" style={{ marginBottom: '20px' }}>
+                <div className={`subtab-slider ${activeTab === 'stats' ? 'middle' : activeTab === 'list' ? 'right' : ''}`}></div>
+                <button className={`tab-btn ${activeTab === 'import' ? 'active' : ''}`} onClick={() => setActiveTab('import')}>
+                    📥 {t.bill?.importTitle || '导入'}
+                </button>
+                <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
+                    📊 {t.bill?.categoryStats || '统计'}
+                </button>
+                <button className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`} onClick={() => setActiveTab('list')}>
+                    📝 {t.bill?.recordCount || '明细'}
+                </button>
+            </div>
+
+            <div style={{ padding: '0 20px' }}>
+                {activeTab === 'import' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 导入指南 */}
+                        <div className="settings-card-new">
+                            <div className="section-label">📖 {t.bill?.howToExport || '导出指南'}</div>
+                            <div style={{ background: 'var(--input-bg)', borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
+                                <p style={{ margin: '0 0 8px', fontWeight: 700, color: 'var(--text-main)' }}>微信账单导出：</p>
+                                <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--text-soft)', lineHeight: 1.6 }}>
+                                    {t.bill?.step1}<br/>
+                                    {t.bill?.step2}<br/>
+                                    {t.bill?.step3}<br/>
+                                    {t.bill?.step4}
+                                </p>
+                            </div>
+                            
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                accept=".csv,.xlsx,.xls"
+                                style={{ display: 'none' }}
+                                onChange={handleFileSelect}
+                            />
+                            
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={importing}
+                                className="btn-confirm highlight"
+                                style={{
+                                    height: '56px',
+                                    fontSize: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px'
+                                }}
+                            >
+                                {importing ? (
+                                    <><span className="spin">📊</span> 解析中...</>
+                                ) : (
+                                    <><span>📁</span> {t.bill?.selectFile || '选择账单文件'}</>
+                                )}
+                            </button>
+                            
+                            {billRecords.length > 0 && (
+                                <button
+                                    onClick={clearData}
+                                    style={{
+                                        marginTop: '12px',
+                                        width: '100%',
+                                        padding: '14px',
+                                        borderRadius: '14px',
+                                        border: 'none',
+                                        background: '#FFE5E5',
+                                        color: '#FF3B30',
+                                        fontWeight: 700,
+                                        fontSize: '14px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    🗑️ {t.bill?.clearData || '清空数据'} ({billRecords.length} 条)
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'stats' && billRecords.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 总览卡片 */}
+                        <div className="settings-card-new" style={{ background: 'linear-gradient(135deg, var(--card-orange) 0%, #FFF8F3 100%)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', textAlign: 'center' }}>
+                                <div>
+                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--text-soft)' }}>{t.bill?.totalAmount || '总消费'}</p>
+                                    <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: 'var(--accent)' }}>¥{stats.total.toFixed(0)}</p>
+                                </div>
+                                <div>
+                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--text-soft)' }}>{t.bill?.recordCount || '记录数'}</p>
+                                    <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: 'var(--text-main)' }}>{stats.count}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 类别统计 */}
+                        <div className="settings-card-new">
+                            <div className="section-label">📊 {t.bill?.categoryStats || '消费分类'}</div>
+                            {Object.entries(stats.byCategory)
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([cat, amount]) => (
+                                    <div key={cat} style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                                        <span style={{ width: '60px', fontSize: '13px', fontWeight: 600 }}>{cat}</span>
+                                        <div style={{ flex: 1, height: '8px', background: 'var(--input-bg)', borderRadius: '4px', margin: '0 12px', overflow: 'hidden' }}>
+                                            <div style={{ width: `${(amount / stats.total * 100)}%`, height: '100%', background: 'var(--accent-gradient)', borderRadius: '4px' }}></div>
+                                        </div>
+                                        <span style={{ width: '70px', textAlign: 'right', fontSize: '13px', fontWeight: 700 }}>¥{amount.toFixed(0)}</span>
+                                    </div>
+                                ))}
+                        </div>
+
+                        {/* 消费最多商家 */}
+                        <div className="settings-card-new">
+                            <div className="section-label">🏪 {t.bill?.topMerchants || '消费最多商家'}</div>
+                            {stats.topMerchants.map(([merchant, amount], idx) => (
+                                <div key={merchant} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < stats.topMerchants.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: idx < 3 ? 'var(--accent)' : 'var(--input-bg)', color: idx < 3 ? 'white' : 'var(--text-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800 }}>{idx + 1}</span>
+                                        <span style={{ fontSize: '14px', fontWeight: 600 }}>{merchant}</span>
+                                    </div>
+                                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent)' }}>¥{amount.toFixed(0)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'stats' && billRecords.length === 0 && (
+                    <div className="settings-card-new" style={{ textAlign: 'center', padding: '60px 20px' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
+                        <p style={{ color: 'var(--text-soft)' }}>{t.bill?.noData || '暂无数据'}</p>
+                    </div>
+                )}
+
+                {activeTab === 'list' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {billRecords.length > 0 ? billRecords.slice(0, 50).map(record => (
+                            <div key={record.id} className="settings-card-new" style={{ padding: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '15px' }}>{record.merchant}</p>
+                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-soft)' }}>{record.date} · {record.category}</p>
+                                    </div>
+                                    <span style={{ fontSize: '18px', fontWeight: 800, color: record.type === 'expense' ? 'var(--accent)' : '#4CAF50' }}>
+                                        {record.type === 'expense' ? '-' : '+'}¥{record.amount.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="settings-card-new" style={{ textAlign: 'center', padding: '60px 20px' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+                                <p style={{ color: 'var(--text-soft)' }}>{t.bill?.noData || '暂无数据'}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
