@@ -7,19 +7,20 @@ type ActivityType = 'cardio' | 'strength' | 'flexibility' | 'habit' | 'mind' | '
 type DarkModeType = 'manual' | 'system';
 type AnimIntensity = 'strong' | 'medium' | 'weak' | 'off';
 
+interface CalendarReminder {
+    id: string;
+    name: string;
+    time: string; // HH:mm
+    enabled: boolean;
+}
+
 interface ReminderSettings {
-    checkInEnabled: boolean;
-    reminderCount: number;
-    interval: number;
-    dndStart: string;
-    dndEnd: string;
+    calendarReminders: CalendarReminder[];
     auxiliaryEnabled: boolean;
     reportNotify: boolean;
     shareNotify: boolean;
     messageCenterNotify: boolean;
     animIntensity: AnimIntensity;
-    fixedReminderEnabled: boolean;
-    fixedReminderTime: string;
 }
 
 interface AppSettings {
@@ -124,13 +125,21 @@ const TRANSLATIONS = {
             days: '天', items: '项'
         },
         calendar: {
+            title: '日历打卡提醒',
             exportTitle: '导出到系统日历',
             exportDesc: '生成 .ics 文件，导入手机日历获得后台提醒',
             exportBtn: '生成日历文件',
             exportSuccess: '日历文件已生成，请选择"打开"导入',
-            noReminders: '请先开启至少一种提醒（定点提醒或打卡提醒）',
+            noReminders: '请至少添加一个打卡时间',
             iosTip: 'iOS 用户：下载后在分享菜单中选择"添加日历"',
-            androidTip: 'Android 用户：下载后用日历应用打开即可导入'
+            androidTip: 'Android 用户：下载后用日历应用打开即可导入',
+            addReminder: '添加打卡时间',
+            reminderPrefix: '打卡提醒',
+            reminderDesc: '别忘了完成今天的打卡任务哦',
+            editReminder: '编辑打卡时间',
+            deleteReminder: '删除',
+            reminderName: '打卡名称',
+            reminderTime: '提醒时间'
         },
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
@@ -205,13 +214,21 @@ const TRANSLATIONS = {
             days: 'days', items: 'items'
         },
         calendar: {
+            title: 'Calendar Reminders',
             exportTitle: 'Export to Calendar',
             exportDesc: 'Generate .ics file for system calendar reminders',
             exportBtn: 'Generate Calendar File',
             exportSuccess: 'Calendar file generated, open to import',
-            noReminders: 'Please enable at least one reminder first',
+            noReminders: 'Please add at least one reminder',
             iosTip: 'iOS: Select "Add to Calendar" in share menu',
-            androidTip: 'Android: Open with your calendar app'
+            androidTip: 'Android: Open with your calendar app',
+            addReminder: 'Add Reminder',
+            reminderPrefix: 'Check-in',
+            reminderDesc: 'Don\'t forget to complete your check-in task',
+            editReminder: 'Edit Reminder',
+            deleteReminder: 'Delete',
+            reminderName: 'Reminder Name',
+            reminderTime: 'Reminder Time'
         },
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
@@ -228,8 +245,15 @@ const safeVibrate = (pattern: number[]) => {
     }
 };
 
-// 生成 ICS 日历文件并下载
-const generateICSFile = (settings: AppSettings, t: any) => {
+// 生成 ICS 日历文件并下载 - 使用用户自定义的打卡时间
+interface CalendarReminder {
+    id: string;
+    name: string;
+    time: string; // HH:mm
+    enabled: boolean;
+}
+
+const generateICSFile = (reminders: CalendarReminder[], t: any) => {
     const now = new Date();
     const formatDate = (d: Date) => {
         return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -238,9 +262,15 @@ const generateICSFile = (settings: AppSettings, t: any) => {
     let events = '';
     const uidBase = 'jiaqian-' + Date.now();
     
-    // 1. 每日定点提醒事件
-    if (settings.reminders.fixedReminderEnabled) {
-        const [hour, min] = settings.reminders.fixedReminderTime.split(':').map(Number);
+    const activeReminders = reminders.filter(r => r.enabled && r.time);
+    
+    if (activeReminders.length === 0) {
+        alert(t.calendar?.noReminders || '请至少添加一个打卡时间');
+        return false;
+    }
+    
+    activeReminders.forEach((reminder, idx) => {
+        const [hour, min] = reminder.time.split(':').map(Number);
         const dtstart = new Date(now);
         dtstart.setHours(hour, min, 0, 0);
         
@@ -250,77 +280,19 @@ const generateICSFile = (settings: AppSettings, t: any) => {
         }
         
         events += `BEGIN:VEVENT
-UID:${uidBase}-fixed@jiaqian.app
+UID:${uidBase}-${idx}@jiaqian.app
 DTSTART;TZID=Asia/Shanghai:${formatDate(dtstart).replace('Z', '')}
 RRULE:FREQ=DAILY
-SUMMARY:${t.notif.dailyTitle}
-DESCRIPTION:${t.notif.dailyBody}
+SUMMARY:${t.calendar?.reminderPrefix || '打卡'}: ${reminder.name}
+DESCRIPTION:${t.calendar?.reminderDesc || '别忘了完成今天的打卡任务哦'}
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:${t.notif.dailyTitle}
+DESCRIPTION:${reminder.name}
 TRIGGER:-PT0M
 END:VALARM
 END:VEVENT
 `;
-    }
-    
-    // 2. 打卡提醒事件（每小时检查一次，只在未打卡时提醒）
-    if (settings.reminders.checkInEnabled) {
-        // 在免打扰时段外设置提醒
-        const [dndStartHour, dndStartMin] = settings.reminders.dndStart.split(':').map(Number);
-        const [dndEndHour, dndEndMin] = settings.reminders.dndEnd.split(':').map(Number);
-        
-        // 设置几个关键时间点的提醒（早上、中午、下午、晚上）
-        const reminderTimes = [
-            { hour: 9, min: 0, label: 'morning' },
-            { hour: 12, min: 0, label: 'noon' },
-            { hour: 15, min: 0, label: 'afternoon' },
-            { hour: 18, min: 0, label: 'evening' }
-        ];
-        
-        reminderTimes.forEach((time, idx) => {
-            // 检查是否在免打扰时段
-            const timeInMinutes = time.hour * 60 + time.min;
-            const dndStartMinutes = dndStartHour * 60 + dndStartMin;
-            const dndEndMinutes = dndEndHour * 60 + dndEndMin;
-            
-            let isInDND = false;
-            if (dndStartMinutes < dndEndMinutes) {
-                isInDND = timeInMinutes >= dndStartMinutes && timeInMinutes <= dndEndMinutes;
-            } else {
-                // 跨午夜
-                isInDND = timeInMinutes >= dndStartMinutes || timeInMinutes <= dndEndMinutes;
-            }
-            
-            if (!isInDND) {
-                const dtstart = new Date(now);
-                dtstart.setHours(time.hour, time.min, 0, 0);
-                
-                if (dtstart < now) {
-                    dtstart.setDate(dtstart.getDate() + 1);
-                }
-                
-                events += `BEGIN:VEVENT
-UID:${uidBase}-checkin-${time.label}@jiaqian.app
-DTSTART;TZID=Asia/Shanghai:${formatDate(dtstart).replace('Z', '')}
-RRULE:FREQ=DAILY
-SUMMARY:${t.notif.title}
-DESCRIPTION:${t.notif.body}
-BEGIN:VALARM
-ACTION:DISPLAY
-DESCRIPTION:${t.notif.title}
-TRIGGER:-PT0M
-END:VALARM
-END:VEVENT
-`;
-            }
-        });
-    }
-    
-    if (!events) {
-        alert(t.calendar?.noReminders || '请先开启至少一种提醒');
-        return false;
-    }
+    });
     
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -346,7 +318,7 @@ ${events}END:VCALENDAR`;
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `佳倩管家提醒_${now.toLocaleDateString('zh-CN')}.ics`;
+    link.download = `佳倩管家打卡提醒_${now.toLocaleDateString('zh-CN')}.ics`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -355,51 +327,7 @@ ${events}END:VCALENDAR`;
     return true;
 };
 
-// 通过 Service Worker 发送通知（支持后台推送）
-const triggerNotification = async (title: string, body: string, tag?: string) => {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    
-    try {
-        // 检查 Service Worker 是否可用
-        if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.showNotification(title, {
-                body,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
-                badge: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
-                tag: tag || 'checkin-reminder',
-                requireInteraction: false,
-                vibrate: [200, 100, 200]
-            });
-        } else {
-            // 降级方案：如果 SW 不可用，使用传统通知
-            new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' });
-        }
-    } catch (e) { 
-        console.error('通知发送失败:', e);
-    }
-};
 
-// 请求通知权限
-const requestNotificationPermission = async (): Promise<boolean> => {
-    if (typeof Notification === 'undefined') {
-        console.log('浏览器不支持通知 API');
-        return false;
-    }
-    
-    if (Notification.permission === 'granted') {
-        return true;
-    }
-    
-    if (Notification.permission === 'denied') {
-        console.log('通知权限已被拒绝');
-        return false;
-    }
-    
-    // 请求权限
-    const permission = await Notification.requestPermission();
-    return permission === 'granted';
-};
 
 const HomeIcon = ({ active }: { active: boolean }) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.6 }}>
@@ -532,18 +460,16 @@ function App() {
         inAppPopups: true,
         vibration: true,
         reminders: {
-            checkInEnabled: false,
-            reminderCount: 1,
-            interval: 10,
-            dndStart: '23:00',
-            dndEnd: '07:00',
+            calendarReminders: [
+                { id: '1', name: '早起打卡', time: '07:00', enabled: true },
+                { id: '2', name: '喝水提醒', time: '10:00', enabled: false },
+                { id: '3', name: '午休提醒', time: '12:30', enabled: false },
+            ],
             auxiliaryEnabled: true,
             reportNotify: true,
             shareNotify: true,
             messageCenterNotify: false,
-            animIntensity: 'medium',
-            fixedReminderEnabled: false,
-            fixedReminderTime: '17:00'
+            animIntensity: 'medium'
         }
     });
     
@@ -555,7 +481,6 @@ function App() {
 
     const t = TRANSLATIONS[settings.language];
     const firstUpdate = useRef(true);
-    const lastFixedNotifDay = useRef<string | null>(null);
 
     const getDynamicGreeting = () => {
         const hour = new Date().getHours();
@@ -575,68 +500,7 @@ function App() {
         else if (m === 1 && d === 1) setActiveFestival('newyear');
     }, []);
 
-    // 检查是否在免打扰时段
-    const isInDND = (timeStr: string, dndStart: string, dndEnd: string): boolean => {
-        if (dndStart < dndEnd) {
-            return timeStr >= dndStart && timeStr <= dndEnd;
-        }
-        // 跨午夜的情况（如 23:00 - 07:00）
-        return timeStr >= dndStart || timeStr <= dndEnd;
-    };
 
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        
-        const checkReminders = async () => {
-            // 确保权限已授予
-            if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-            
-            const now = new Date();
-            const hour = now.getHours();
-            const min = now.getMinutes();
-            const timeStr = `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
-            const todayKey = now.toDateString();
-            const currentMinute = `${hour}:${min}`; // 用于精确匹配
-
-            // 每日定点提醒
-            if (settings.reminders.fixedReminderEnabled) {
-                const reminderTime = settings.reminders.fixedReminderTime;
-                const [reminderHour, reminderMin] = reminderTime.split(':').map(Number);
-                const reminderMinuteStr = `${reminderHour}:${reminderMin}`;
-                
-                // 只在设定的时间点触发（精确到分钟）
-                if (currentMinute === reminderMinuteStr && lastFixedNotifDay.current !== todayKey) {
-                    // 检查免打扰
-                    if (!isInDND(timeStr, settings.reminders.dndStart, settings.reminders.dndEnd)) {
-                        await triggerNotification(t.notif.dailyTitle, t.notif.dailyBody, 'daily-reminder');
-                        lastFixedNotifDay.current = todayKey;
-                        if (settings.vibration) safeVibrate([200, 100, 200]);
-                    }
-                }
-            }
-
-            // 打卡提醒（整点检查，每小时一次）
-            if (settings.reminders.checkInEnabled && min === 0) {
-                if (isInDND(timeStr, settings.reminders.dndStart, settings.reminders.dndEnd)) return;
-                
-                const todayTimestamp = new Date().setHours(0,0,0,0);
-                const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === todayTimestamp);
-                
-                if (!hasTodayCheckin) {
-                    await triggerNotification(t.notif.title, t.notif.body, 'checkin-reminder');
-                    if (settings.vibration) safeVibrate([200, 100, 200]);
-                }
-            }
-        };
-        
-        // 每分钟检查一次
-        interval = setInterval(checkReminders, 60000);
-        
-        // 立即检查一次（页面加载时）
-        checkReminders();
-        
-        return () => clearInterval(interval);
-    }, [settings.reminders, records, t, settings.vibration]);
 
     useEffect(() => {
         const handleBeforeInstall = (e: any) => {
@@ -889,26 +753,10 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
     const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
     const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
     const [guideType, setGuideType] = useState<'ios' | 'quark' | 'default' | null>(null);
-    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
-
-    // 检查通知权限状态
-    useEffect(() => {
-        if (typeof Notification === 'undefined') {
-            setNotifPermission('unsupported');
-        } else {
-            setNotifPermission(Notification.permission);
-        }
-    }, []);
-
-    // 请求通知权限
-    const handleRequestPermission = async () => {
-        const granted = await requestNotificationPermission();
-        setNotifPermission(granted ? 'granted' : 'denied');
-        if (granted) {
-            // 发送测试通知
-            await triggerNotification('权限已开启', '您已成功开启通知权限，打卡提醒将准时送达！✨', 'test-notification');
-        }
-    };
+    const [showAddReminder, setShowAddReminder] = useState(false);
+    const [editingReminder, setEditingReminder] = useState<CalendarReminder | null>(null);
+    const [newReminderName, setNewReminderName] = useState('');
+    const [newReminderTime, setNewReminderTime] = useState('08:00');
 
     const handleInstall = async () => {
         if (deferredPrompt) {
@@ -924,6 +772,67 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
             else setGuideType('default');
         }
     };
+
+    // 添加/编辑打卡提醒
+    const handleSaveReminder = () => {
+        if (!newReminderName.trim() || !newReminderTime) return;
+        
+        const reminders = [...settings.reminders.calendarReminders];
+        
+        if (editingReminder) {
+            // 编辑现有提醒
+            const idx = reminders.findIndex(r => r.id === editingReminder.id);
+            if (idx >= 0) {
+                reminders[idx] = { ...editingReminder, name: newReminderName.trim(), time: newReminderTime };
+            }
+        } else {
+            // 添加新提醒
+            reminders.push({
+                id: Date.now().toString(),
+                name: newReminderName.trim(),
+                time: newReminderTime,
+                enabled: true
+            });
+        }
+        
+        updateReminders({ calendarReminders: reminders });
+        setShowAddReminder(false);
+        setEditingReminder(null);
+        setNewReminderName('');
+        setNewReminderTime('08:00');
+    };
+
+    // 删除打卡提醒
+    const handleDeleteReminder = (id: string) => {
+        const reminders = settings.reminders.calendarReminders.filter(r => r.id !== id);
+        updateReminders({ calendarReminders: reminders });
+    };
+
+    // 切换提醒启用状态
+    const toggleReminder = (id: string) => {
+        const reminders = settings.reminders.calendarReminders.map(r => 
+            r.id === id ? { ...r, enabled: !r.enabled } : r
+        );
+        updateReminders({ calendarReminders: reminders });
+    };
+
+    // 开始编辑
+    const startEdit = (reminder: CalendarReminder) => {
+        setEditingReminder(reminder);
+        setNewReminderName(reminder.name);
+        setNewReminderTime(reminder.time);
+        setShowAddReminder(true);
+    };
+
+    // 取消编辑
+    const cancelEdit = () => {
+        setShowAddReminder(false);
+        setEditingReminder(null);
+        setNewReminderName('');
+        setNewReminderTime('08:00');
+    };
+
+    const activeReminders = settings.reminders.calendarReminders.filter(r => r.enabled);
 
     return (
         <div className="view">
@@ -990,133 +899,87 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                     </div>
                 </div>
 
+                {/* 日历打卡提醒 */}
                 <div className="settings-card-new">
-                    <div className="section-label">{t.reminder.title}</div>
+                    <div className="section-label" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <span>{t.calendar.title}</span>
+                        <button 
+                            onClick={() => setShowAddReminder(true)}
+                            style={{fontSize: '13px', fontWeight: '700', color: 'var(--accent)', background: 'none', border: 'none', padding: '4px 8px'}}
+                        >
+                            + {t.calendar.addReminder}
+                        </button>
+                    </div>
                     
-                    {/* 通知权限请求按钮 */}
-                    {notifPermission !== 'granted' && (
-                        <div className="setting-row" style={{background: 'rgba(255, 182, 163, 0.15)', borderRadius: '16px', marginBottom: '12px', padding: '16px'}}>
-                            <div className="setting-left">
-                                <div className="icon-circle" style={{background: '#FFB6A3'}}>🔔</div>
-                                <div>
-                                    <div className="setting-title" style={{color: '#FF8A65', fontWeight: '800'}}>
-                                        {notifPermission === 'denied' ? t.reminder.permissionDenied.split('。')[0] : t.reminder.enableNotification}
+                    {settings.reminders.calendarReminders.length === 0 ? (
+                        <div style={{padding: '24px', textAlign: 'center', color: 'var(--text-soft)'}}>
+                            <div style={{fontSize: '32px', marginBottom: '8px'}}>📅</div>
+                            <p>{t.calendar.noReminders}</p>
+                        </div>
+                    ) : (
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                            {settings.reminders.calendarReminders.map(reminder => (
+                                <div key={reminder.id} className="setting-row" style={{padding: '12px 0'}}>
+                                    <div className="setting-left" style={{gap: '12px'}}>
+                                        <label className="switch" style={{transform: 'scale(0.85)'}}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={reminder.enabled} 
+                                                onChange={() => toggleReminder(reminder.id)}
+                                            />
+                                            <span className="slider-round"></span>
+                                        </label>
+                                        <div>
+                                            <div className="setting-title" style={{fontSize: '15px'}}>{reminder.name}</div>
+                                            <div className="setting-desc">{reminder.time}</div>
+                                        </div>
                                     </div>
-                                    <div className="setting-desc">
-                                        {notifPermission === 'denied' 
-                                            ? t.reminder.permissionDenied
-                                            : t.reminder.notificationDesc}
+                                    <div className="setting-right" style={{gap: '8px'}}>
+                                        <button 
+                                            onClick={() => startEdit(reminder)}
+                                            style={{background: 'none', border: 'none', fontSize: '16px', padding: '4px'}}
+                                        >✏️</button>
+                                        <button 
+                                            onClick={() => handleDeleteReminder(reminder.id)}
+                                            style={{background: 'none', border: 'none', fontSize: '16px', padding: '4px', color: '#FF6B6B'}}
+                                        >🗑️</button>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="setting-right">
-                                {notifPermission !== 'denied' && (
+                            ))}
+                        </div>
+                    )}
+                    
+                    {/* 导出按钮 */}
+                    {activeReminders.length > 0 && (
+                        <>
+                            <div className="divider" />
+                            <div className="setting-row" style={{paddingTop: '16px', alignItems: 'flex-start'}}>
+                                <div className="setting-left" style={{flex: 1}}>
+                                    <div className="icon-circle" style={{background: '#4CAF50'}}>📲</div>
+                                    <div style={{flex: 1}}>
+                                        <div className="setting-title">{t.calendar.exportTitle}</div>
+                                        <div className="setting-desc">{t.calendar.exportDesc}</div>
+                                    </div>
+                                </div>
+                                <div className="setting-right">
                                     <button 
                                         className="setting-action-btn" 
-                                        onClick={handleRequestPermission}
-                                        style={{background: '#FFB6A3', color: 'white'}}
+                                        onClick={() => {
+                                            generateICSFile(settings.reminders.calendarReminders, t);
+                                            safeVibrate([50, 30, 50]);
+                                        }}
+                                        style={{background: '#4CAF50', color: 'white'}}
                                     >
-                                        {t.reminder.goAuth}
+                                        {t.calendar.exportBtn}
                                     </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                    
-                    <div className="setting-row">
-                        <div className="setting-left">
-                            <div className="icon-circle">⏰</div>
-                            <div>
-                                <div className="setting-title">{t.reminder.checkIn}</div>
-                                <div className="setting-desc">{notifPermission === 'granted' ? t.reminder.granted : t.reminder.authNeeded}</div>
-                            </div>
-                        </div>
-                        <div className="setting-right">
-                            <label className="switch">
-                                <input 
-                                    type="checkbox" 
-                                    checked={settings.reminders.checkInEnabled && notifPermission === 'granted'} 
-                                    onChange={e => {
-                                        if (notifPermission !== 'granted') {
-                                            handleRequestPermission();
-                                            return;
-                                        }
-                                        updateReminders({ checkInEnabled: e.target.checked });
-                                    }} 
-                                    disabled={notifPermission !== 'granted'}
-                                />
-                                <span className="slider-round"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="divider" />
-
-                    <div className="setting-row">
-                        <div className="setting-left">
-                            <div className="icon-circle">📅</div>
-                            <div>
-                                <div className="setting-title">{t.reminder.fixedReminder}</div>
-                                <div className="setting-desc">{t.reminder.fixedTime}</div>
-                            </div>
-                        </div>
-                        <div className="setting-right">
-                            <label className="switch">
-                                <input 
-                                    type="checkbox" 
-                                    checked={settings.reminders.fixedReminderEnabled && notifPermission === 'granted'} 
-                                    onChange={e => {
-                                        if (notifPermission !== 'granted') {
-                                            handleRequestPermission();
-                                            return;
-                                        }
-                                        updateReminders({ fixedReminderEnabled: e.target.checked });
-                                    }}
-                                    disabled={notifPermission !== 'granted'}
-                                />
-                                <span className="slider-round"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {settings.reminders.fixedReminderEnabled && (
-                        <div className="setting-row" style={{ paddingTop: 6 }}>
-                            <div className="setting-left" style={{ gap: 8 }}></div>
-                            <div className="setting-right"><input type="time" className="time-input-simple" value={settings.reminders.fixedReminderTime} onChange={e => updateReminders({ fixedReminderTime: e.target.value })} /></div>
-                        </div>
-                    )}
-                </div>
-
-                {/* 导出到系统日历 */}
-                <div className="settings-card-new">
-                    <div className="section-label">{t.calendar.exportTitle}</div>
-                    <div className="setting-row" style={{alignItems: 'flex-start'}}>
-                        <div className="setting-left" style={{flex: 1}}>
-                            <div className="icon-circle" style={{background: '#4CAF50'}}>📅</div>
-                            <div style={{flex: 1}}>
-                                <div className="setting-title">{t.calendar.exportTitle}</div>
-                                <div className="setting-desc">{t.calendar.exportDesc}</div>
-                                <div style={{marginTop: '8px', fontSize: '11px', color: 'var(--text-soft)', lineHeight: '1.5'}}>
-                                    💡 {settings.language === 'zh' ? t.calendar.iosTip : t.calendar.androidTip}
                                 </div>
                             </div>
-                        </div>
-                        <div className="setting-right">
-                            <button 
-                                className="setting-action-btn" 
-                                onClick={() => {
-                                    const success = generateICSFile(settings, t);
-                                    if (success) {
-                                        safeVibrate([50, 30, 50]);
-                                    }
-                                }}
-                                style={{background: settings.reminders.checkInEnabled || settings.reminders.fixedReminderEnabled ? '#4CAF50' : '#ccc', color: 'white'}}
-                                disabled={!settings.reminders.checkInEnabled && !settings.reminders.fixedReminderEnabled}
-                            >
-                                {t.calendar.exportBtn}
-                            </button>
-                        </div>
-                    </div>
+                            <div style={{marginTop: '12px', padding: '12px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: '1.6'}}>
+                                💡 {t.calendar.iosTip}<br/>
+                                💡 {t.calendar.androidTip}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div className="settings-card-new">
@@ -1144,6 +1007,59 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                         <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '850' }}>{t.addToHome}</h3>
                         <p style={{ fontSize: '14px', color: 'var(--text-soft)', lineHeight: '1.6', fontWeight: '600', marginBottom: '24px' }}>{guideType === 'ios' ? t.addToHomeGuideIOS : guideType === 'quark' ? t.addToHomeGuideQuark : t.addToHomeGuideDefault}</p>
                         <button onClick={() => setGuideType(null)} className="btn-confirm highlight" style={{ width: '100%', height: '56px' }}>好的，知道啦</button>
+                    </div>
+                </div>
+            )}
+
+            {/* 添加/编辑打卡提醒弹窗 */}
+            {showAddReminder && (
+                <div className="drawer-overlay" onClick={cancelEdit} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)', zIndex: 3000, display: 'flex', alignItems: 'flex-end' }}>
+                    <div className="drawer-content" onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'white', borderTopLeftRadius: '40px', borderTopRightRadius: '40px', padding: '32px 24px' }}>
+                        <h3 style={{ margin: '0 0 24px', fontSize: '18px', fontWeight: '850' }}>
+                            {editingReminder ? t.calendar.editReminder : t.calendar.addReminder}
+                        </h3>
+                        
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-main)' }}>{t.calendar.reminderName}</label>
+                            <input 
+                                type="text" 
+                                value={newReminderName}
+                                onChange={e => setNewReminderName(e.target.value)}
+                                placeholder={t.calendar.reminderName}
+                                className="time-input-simple"
+                                style={{ width: '100%' }}
+                                autoFocus
+                            />
+                        </div>
+                        
+                        <div style={{ marginBottom: '28px' }}>
+                            <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-main)' }}>{t.calendar.reminderTime}</label>
+                            <input 
+                                type="time" 
+                                value={newReminderTime}
+                                onChange={e => setNewReminderTime(e.target.value)}
+                                className="time-input-simple"
+                                style={{ width: '100%', fontSize: '18px' }}
+                            />
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button 
+                                onClick={handleSaveReminder}
+                                disabled={!newReminderName.trim()}
+                                className="btn-confirm highlight"
+                                style={{ flex: 1, opacity: newReminderName.trim() ? 1 : 0.5 }}
+                            >
+                                {t.complete} ✨
+                            </button>
+                            <button 
+                                onClick={cancelEdit}
+                                className="btn-confirm"
+                                style={{ flex: 1, background: '#F4F4F7', color: 'var(--text-main)' }}
+                            >
+                                {t.nextTime}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
