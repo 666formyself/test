@@ -205,7 +205,7 @@ const TRANSLATIONS = {
             category: '类别',
             amount: '金额',
             noData: '暂无数据，请先导入账单'
-        }
+        },
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
             habits: '自律习惯', mind: '精神寄托', daily: '日常事务', custom: '自定义'
