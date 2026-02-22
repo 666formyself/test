@@ -540,7 +540,7 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 
 .subtab-slider {
     position: absolute;
-    width: calc(50% - 4px);
+    width: calc(33.333% - 3px);
     height: calc(100% - 8px);
     background: var(--card-bg);
     border-radius: 16px;
@@ -550,17 +550,29 @@ input:checked + .slider-round:before { transform: translateX(20px); }
     transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+.subtab-slider.middle {
+    transform: translateX(calc(100% + 3px));
+}
+
+.subtab-slider.right {
+    transform: translateX(calc(200% + 6px));
+}
+
 .subtab-slider.right { transform: translateX(100%); }
 
 .tab-btn {
     flex: 1;
     z-index: 1;
-    font-size: 13px;
-    font-weight: 900;
+    font-size: 12px;
+    font-weight: 800;
     color: var(--text-soft);
     border: none;
     background: none;
     cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 4px;
 }
 
 .tab-btn.active { color: var(--text-main); }
