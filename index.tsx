@@ -2458,198 +2458,191 @@ function BillView({ t, setView }: any) {
         localStorage.setItem('jq_bills', JSON.stringify(billRecords));
     }, [billRecords]);
 
-    // 解析CSV文件
-    const parseCSV = (content: string, source: 'wechat' | 'alipay'): BillRecord[] => {
-        const lines = content.split('\n').filter(line => line.trim());
-        const records: BillRecord[] = [];
-        
-        // 跳过标题行
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i];
-            const parts = line.split(',');
+    // 用 xlsx 库统一解析 CSV/XLSX
+    const parseBills = (data: ArrayBuffer, source: 'wechat' | 'alipay'): BillRecord[] => {
+        try {
+            // xlsx 库可以同时处理 CSV 和 Excel
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            // 以二维数组形式读取，保留原始数据格式
+            const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1, defval: '' });
             
-            try {
-                if (source === 'wechat') {
-                    // 微信格式：交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注
-                    const date = parts[0]?.trim();
-                    const merchant = parts[2]?.trim();
-                    const type = parts[4]?.trim() === '收入' ? 'income' : 'expense';
-                    const amountStr = parts[5]?.replace('¥', '').trim();
-                    const amount = parseFloat(amountStr) || 0;
-                    
-                    if (date && merchant && amount > 0) {
-                        records.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            date: date.split(' ')[0],
-                            merchant,
-                            category: guessCategory(merchant),
-                            amount,
-                            type,
-                            source
-                        });
-                    }
-                } else {
-                    // 支付宝格式：交易号,商家订单号,交易创建时间,付款时间,最近修改时间,交易来源地,类型,交易对方,商品名称,金额（元）,收/支,交易状态,服务费（元）,成功退款（元）,备注,资金状态
-                    const date = parts[2]?.trim();
-                    const merchant = parts[7]?.trim();
-                    const type = parts[10]?.trim() === '收入' ? 'income' : 'expense';
-                    const amountStr = parts[9]?.trim();
-                    const amount = parseFloat(amountStr) || 0;
-                    
-                    if (date && merchant && amount > 0) {
-                        records.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            date: date.split(' ')[0],
-                            merchant,
-                            category: guessCategory(merchant),
-                            amount,
-                            type,
-                            source
-                        });
-                    }
-                }
-            } catch (e) {
-                console.error('Parse error:', e);
+            const records: BillRecord[] = [];
+            console.log(`[Bill Import] Parsing ${source}, total rows:`, jsonData.length);
+            console.log('[Bill Import] Header row:', jsonData[0]);
+            
+            // 打印前5行原始数据用于调试
+            console.log('[Bill Import] First 5 rows:');
+            for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+                console.log(`  Row ${i}:`, jsonData[i]);
             }
+            
+            // 尝试自动检测列位置
+            const headerRow = jsonData[0] || [];
+            let dateCol = -1, merchantCol = -1, typeCol = -1, amountCol = -1;
+            
+            // 根据表头关键词检测列位置
+            headerRow.forEach((col: string, idx: number) => {
+                const colLower = String(col).toLowerCase();
+                // 日期列
+                if (colLower.includes('时间') || colLower.includes('date') || colLower.includes('创建')) {
+                    dateCol = idx;
+                }
+                // 商户列
+                if (colLower.includes('对方') || colLower.includes('商户') || colLower.includes('商家') || colLower.includes('counterparty')) {
+                    merchantCol = idx;
+                }
+                // 类型列（收/支）
+                if (colLower.includes('收/支') || colLower.includes('类型') || colLower.includes('income/expense')) {
+                    typeCol = idx;
+                }
+                // 金额列
+                if (colLower.includes('金额') || colLower.includes('amount') || colLower.includes('钱')) {
+                    amountCol = idx;
+                }
+            });
+            
+            console.log('[Bill Import] Detected columns:', { dateCol, merchantCol, typeCol, amountCol });
+            
+            // 如果无法自动检测，使用默认列位置
+            if (source === 'wechat') {
+                // 微信默认：交易时间=0, 交易对方=2, 收/支=4, 金额(元)=5
+                if (dateCol === -1) dateCol = 0;
+                if (merchantCol === -1) merchantCol = 2;
+                if (typeCol === -1) typeCol = 4;
+                if (amountCol === -1) amountCol = 5;
+            } else {
+                // 支付宝默认：交易创建时间=2, 交易对方=7, 收/支=10, 金额（元）=9
+                if (dateCol === -1) dateCol = 2;
+                if (merchantCol === -1) merchantCol = 7;
+                if (typeCol === -1) typeCol = 10;
+                if (amountCol === -1) amountCol = 9;
+            }
+            
+            // 跳过标题行，从第2行开始
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length < Math.max(dateCol, merchantCol, typeCol, amountCol) + 1) {
+                    continue;
+                }
+                
+                try {
+                    const date = String(row[dateCol] || '').trim();
+                    let merchant = String(row[merchantCol] || '').trim();
+                    const typeStr = String(row[typeCol] || '').trim();
+                    const type: 'income' | 'expense' = typeStr === '收入' ? 'income' : 'expense';
+                    const amountStr = String(row[amountCol] || '').replace(/[¥,]/g, '').trim();
+                    const amount = parseFloat(amountStr) || 0;
+                    
+                    // 调试：打印前几行数据
+                    if (i <= 3) {
+                        console.log(`[Bill Import] Row ${i}:`, { date, merchant, typeStr, amountStr, amount });
+                    }
+                    
+                    // 如果商户为空，尝试使用商品名称列作为备选
+                    if (!merchant && source === 'wechat' && row[3]) {
+                        merchant = String(row[3] || '').trim(); // 微信商品列
+                    }
+                    if (!merchant && source === 'alipay' && row[8]) {
+                        merchant = String(row[8] || '').trim(); // 支付宝商品名称列
+                    }
+                    
+                    // 验证数据有效性
+                    if (!date || amount <= 0) {
+                        if (i <= 3) {
+                            console.log(`[Bill Import] Row ${i} skipped: invalid data`, { date, merchant, amount });
+                        }
+                        continue;
+                    }
+                    
+                    // 提取日期部分（去掉时间）
+                    const dateOnly = date.split(' ')[0].split('T')[0];
+                    
+                    records.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        date: dateOnly,
+                        merchant: merchant || '未知商户',
+                        category: guessCategory(merchant),
+                        amount,
+                        type,
+                        source
+                    });
+                } catch (e) {
+                    console.error(`[Bill Import] Parse row ${i} error:`, e);
+                }
+            }
+            
+            console.log(`[Bill Import] Parsed ${records.length} valid records`);
+            return records;
+        } catch (e) {
+            console.error('[Bill Import] Parse error:', e);
+            return [];
         }
-        
-        return records;
     };
 
     // 根据商家名称猜测类别
     const guessCategory = (merchant: string): string => {
+        if (!merchant) return '其他';
+        const m = merchant.toLowerCase();
         const categories: Record<string, string[]> = {
-            '餐饮': ['餐厅', '饭店', '火锅', '烧烤', '奶茶', '咖啡', '肯德基', '麦当劳', '必胜客', '星巴克', '瑞幸', '美食', '小吃', '面馆', '饺子', '寿司', '料理'],
-            '购物': ['超市', '便利店', '商场', '百货', '淘宝', '京东', '拼多多', '天猫', '唯品会', '超市', '沃尔玛', '家乐福'],
-            '交通': ['地铁', '公交', '打车', '滴滴', '出租车', '加油', '停车', '高铁', '火车', '机票'],
-            '娱乐': ['电影', 'KTV', '游戏', '充值', '会员', '视频', '音乐', '书店', '网吧'],
-            '生活': ['水电', '煤气', '物业', '房租', '宽带', '话费', '快递', '洗衣', '理发'],
-            '医疗': ['医院', '药店', '诊所', '体检'],
-            '教育': ['培训', '课程', '学费', '书本', '教材']
+            '餐饮': ['餐厅', '饭店', '火锅', '烧烤', '奶茶', '咖啡', '肯德基', '麦当劳', '必胜客', '星巴克', '瑞幸', '美食', '小吃', '面馆', '饺子', '寿司', '料理', '快餐', '汉堡', ' pizza', '披萨', '烘焙', '面包', 'cake', '饮品', '酒吧', 'pub', '料理', '食堂', 'canteen', 'kfc', 'mcdonald', 'burger', 'cafe'],
+            '购物': ['超市', '便利店', '商场', '百货', '淘宝', '京东', '拼多多', '天猫', '唯品会', '超市', '沃尔玛', '家乐福', 'costco', '山姆', '盒马', '永辉', '华润', '便利蜂', '711', 'seven-eleven', 'familymart', 'lawson', 'store', 'shop', 'mall', 'market'],
+            '交通': ['地铁', '公交', '打车', '滴滴', '出租车', '加油', '停车', '高铁', '火车', '机票', '地铁', 'metro', 'subway', 'uber', 'didi', 'taxi', '加油站', 'petrol', ' parking', '航空', 'airlines', '国航', '南航', '东航'],
+            '娱乐': ['电影', 'ktv', 'KTV', '游戏', '充值', '会员', '视频', '音乐', '书店', '网吧', 'netflix', '爱奇艺', '腾讯', '优酷', 'bilibili', 'steam', 'app store', 'apple', 'google play', 'cinema', 'theater', '剧院'],
+            '生活': ['水电', '煤气', '燃气', '物业', '房租', '宽带', '话费', '快递', '洗衣', '理发', 'hair', 'salon', 'beauty', '物业', 'utility', 'phone bill', 'mobile', '电信', '联通', '移动', '快递', 'express', 'logistics'],
+            '医疗': ['医院', '药店', '诊所', '体检', 'hospital', 'pharmacy', 'drug', 'clinic', 'medical', 'dental', '牙医'],
+            '教育': ['培训', '课程', '学费', '书本', '教材', 'education', 'course', 'training', 'school', 'university', 'college', '学费', 'tutor', 'learn']
         };
         
         for (const [cat, keywords] of Object.entries(categories)) {
-            if (keywords.some(k => merchant.includes(k))) return cat;
+            if (keywords.some(k => m.includes(k.toLowerCase()))) return cat;
         }
         return '其他';
     };
 
-    // 解析XLSX文件
-    const parseXLSX = (data: ArrayBuffer, source: 'wechat' | 'alipay'): BillRecord[] => {
-        try {
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 });
-            
-            const records: BillRecord[] = [];
-            // 跳过标题行
-            for (let i = 1; i < jsonData.length; i++) {
-                const row = jsonData[i];
-                if (!row || row.length < 5) continue;
-                
-                try {
-                    if (source === 'wechat') {
-                        // 微信格式：交易时间,交易类型,交易对方,商品,收/支,金额(元)...
-                        const date = String(row[0] || '').trim();
-                        const merchant = String(row[2] || '').trim();
-                        const type = String(row[4] || '').trim() === '收入' ? 'income' : 'expense';
-                        const amountStr = String(row[5] || '').replace('¥', '').trim();
-                        const amount = parseFloat(amountStr) || 0;
-                        
-                        if (date && merchant && amount > 0) {
-                            records.push({
-                                id: Math.random().toString(36).substr(2, 9),
-                                date: date.split(' ')[0],
-                                merchant,
-                                category: guessCategory(merchant),
-                                amount,
-                                type,
-                                source
-                            });
-                        }
-                    } else {
-                        // 支付宝格式：交易号,商家订单号,交易创建时间...交易对方,商品名称,金额（元）,收/支...
-                        const date = String(row[2] || '').trim();
-                        const merchant = String(row[7] || '').trim();
-                        const type = String(row[10] || '').trim() === '收入' ? 'income' : 'expense';
-                        const amountStr = String(row[9] || '').trim();
-                        const amount = parseFloat(amountStr) || 0;
-                        
-                        if (date && merchant && amount > 0) {
-                            records.push({
-                                id: Math.random().toString(36).substr(2, 9),
-                                date: date.split(' ')[0],
-                                merchant,
-                                category: guessCategory(merchant),
-                                amount,
-                                type,
-                                source
-                            });
-                        }
-                    }
-                } catch (e) {
-                    console.error('Parse row error:', e);
-                }
-            }
-            return records;
-        } catch (e) {
-            console.error('XLSX parse error:', e);
-            return [];
-        }
-    };
+
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         
         setImporting(true);
-        const isXLSX = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
         
         const reader = new FileReader();
         
         reader.onload = (event) => {
-            let newRecords: BillRecord[] = [];
-            
-            if (isXLSX) {
-                // XLSX 文件处理
-                const data = event.target?.result as ArrayBuffer;
-                if (!data) {
-                    alert(t.bill?.parseError || '解析失败');
-                    setImporting(false);
-                    return;
-                }
-                // 检测来源（微信/支付宝）- 通过读取部分文本判断
-                const textSample = new TextDecoder().decode(data.slice(0, 2000));
-                const source: 'wechat' | 'alipay' = textSample.includes('微信') || textSample.includes('WeChat') ? 'wechat' : 'alipay';
-                newRecords = parseXLSX(data, source);
-            } else {
-                // CSV 文件处理
-                const content = event.target?.result as string;
-                if (!content) {
-                    alert(t.bill?.parseError || '解析失败');
-                    setImporting(false);
-                    return;
-                }
-                // 检测是微信还是支付宝
-                const source: 'wechat' | 'alipay' = content.includes('微信') || content.includes('WeChat') ? 'wechat' : 'alipay';
-                newRecords = parseCSV(content, source);
+            const data = event.target?.result as ArrayBuffer;
+            if (!data) {
+                alert(t.bill?.parseError || '解析失败');
+                setImporting(false);
+                return;
             }
+            
+            // 检测来源（微信/支付宝）- 通过读取部分文本判断
+            const textSample = new TextDecoder().decode(data.slice(0, 5000));
+            const source: 'wechat' | 'alipay' = textSample.includes('微信') || textSample.includes('WeChat') || textSample.includes('微信支付') ? 'wechat' : 'alipay';
+            
+            console.log('[Bill Import] Detected source:', source);
+            
+            const newRecords = parseBills(data, source);
             
             if (newRecords.length > 0) {
                 setBillRecords(prev => [...newRecords, ...prev]);
                 alert((t.bill?.parseSuccess || '成功导入 {count} 条记录').replace('{count}', String(newRecords.length)));
                 setActiveTab('stats');
             } else {
-                alert(t.bill?.parseError || '未找到有效记录');
+                alert(t.bill?.parseError || '未找到有效记录，请检查文件格式是否为微信/支付宝导出格式');
             }
             setImporting(false);
         };
         
-        if (isXLSX) {
-            reader.readAsArrayBuffer(file);
-        } else {
-            reader.readAsText(file, 'utf-8');
-        }
+        reader.onerror = () => {
+            alert(t.bill?.parseError || '文件读取失败');
+            setImporting(false);
+        };
+        
+        // 统一使用 ArrayBuffer 读取，xlsx 库可以处理 CSV 和 Excel
+        reader.readAsArrayBuffer(file);
     };
 
     const clearData = () => {
