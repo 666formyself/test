@@ -253,6 +253,64 @@ interface CalendarReminder {
     enabled: boolean;
 }
 
+// 每日情话库
+const LOVE_QUOTES = {
+    zh: [
+        { text: "万物皆有裂痕，那是光照进来的地方，而你就是我的光。", author: "伦纳德·科恩" },
+        { text: "我想和你一起生活，在某个小镇，共享无尽的黄昏和绵绵不绝的钟声。", author: "茨维塔耶娃" },
+        { text: "遇见你之前，我没想过结婚；遇见你之后，结婚我没想过别人。", author: "钱钟书" },
+        { text: "你是我温暖的手套，冰冷的啤酒，带着阳光味道的衬衫，日复一日的梦想。", author: "《恋爱的犀牛》" },
+        { text: "从前车马很慢，书信很远，一生只够爱一个人。", author: "木心" },
+        { text: "我想在你的睫毛上荡秋千，在你的眼睛里数星星。", author: "" },
+        { text: "世界很大，可是我的心很小，只够装下你。", author: "" },
+        { text: "你是我这一生等了半世未拆的礼物。", author: "林夕" },
+        { text: "春水初生，春林初盛，春风十里，不如你。", author: "冯唐" },
+        { text: "醒来觉得甚是爱你。", author: "朱生豪" },
+        { text: "我想和你互相浪费，一起虚度短的沉默，长的无意义。", author: "李元胜" },
+        { text: "如果全世界都对你恶语相加，我就对你说上一世情话。", author: "马頔" },
+        { text: "愿有岁月可回首，且以深情共白头。", author: "" },
+        { text: "你走，我不送你；你来，无论多大风雨，我都去接你。", author: "梁实秋" },
+        { text: "海底月是天上月，眼前人是心上人。", author: "张爱玲" },
+        { text: "世间所有的相遇，都是久别重逢。", author: "《一代宗师》" },
+        { text: "我喜欢你不是一见钟情的见色起意，而是朝夕相处的日久生情。", author: "" },
+        { text: "你微微地笑着，不同我说什么话，而我觉得，为了这个，我已等待得很久了。", author: "泰戈尔" },
+        { text: "草在结它的种子，风在摇它的叶子，我们站着，不说话，就十分美好。", author: "顾城" },
+        { text: "今夜我不关心人类，我只想你。", author: "海子" }
+    ],
+    en: [
+        { text: "I love you not because of who you are, but because of who I am when I am with you.", author: "Roy Croft" },
+        { text: "The best thing to hold onto in life is each other.", author: "Audrey Hepburn" },
+        { text: "I would rather spend one lifetime with you, than face all the ages of this world alone.", author: "J.R.R. Tolkien" },
+        { text: "You are my sun, my moon, and all my stars.", author: "E.E. Cummings" },
+        { text: "In all the world, there is no heart for me like yours.", author: "Maya Angelou" },
+        { text: "To the world you may be one person, but to one person you are the world.", author: "Dr. Seuss" },
+        { text: "I saw that you were perfect, and so I loved you. Then I saw that you were not perfect and I loved you even more.", author: "Angelita Lim" },
+        { text: "I need you like a heart needs a beat.", author: "" },
+        { text: "You are the last thought in my mind before I drift off to sleep and the first thought when I wake up each morning.", author: "" },
+        { text: "If I know what love is, it is because of you.", author: "Hermann Hesse" }
+    ]
+};
+
+// 节日祝福
+const FESTIVAL_WISHES = {
+    valentine: {
+        zh: { text: "情人节快乐！万物皆有回响，而我所有的温柔都想留给你。", title: "❤️ 情人节快乐" },
+        en: { text: "Happy Valentine's Day! In a world full of echoes, my heart only beats for you.", title: "❤️ Happy Valentine's" }
+    },
+    newyear: {
+        zh: { text: "新年快乐！愿新的一年，星辰大海，皆是奔赴。愿你万事顺遂，岁岁平安。", title: "🎆 新年快乐" },
+        en: { text: "Happy New Year! May the new year bring you closer to the stars.", title: "🎆 Happy New Year" }
+    },
+    birthday: {
+        zh: { text: "生日快乐！愿你的每一天都如今天般灿烂，愿所有的美好都如期而至。", title: "🎂 生日快乐" },
+        en: { text: "Happy Birthday! May your day be filled with love, laughter, and cake!", title: "🎂 Happy Birthday" }
+    },
+    anniversary: {
+        zh: { text: "纪念日快乐！时光往复，爱你如初。愿我们携手走过更多个春夏秋冬。", title: "💕 纪念日快乐" },
+        en: { text: "Happy Anniversary! Time goes by, but my love for you remains the same.", title: "💕 Happy Anniversary" }
+    }
+};
+
 const generateICSFile = (reminders: CalendarReminder[], t: any) => {
     const now = new Date();
     const formatDate = (d: Date) => {
@@ -448,6 +506,8 @@ function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
     const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary'>('home');
+    const [showDailyQuote, setShowDailyQuote] = useState(false);
+    const [dailyQuote, setDailyQuote] = useState<{text: string, author?: string, isSpecial?: boolean, type?: 'festival' | 'anniversary'} | null>(null);
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
     const [records, setRecords] = useState<CheckInRecord[]>([]);
     const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
@@ -502,7 +562,69 @@ function App() {
         const d = now.getDate();
         if (m === 2 && d === 14) setActiveFestival('valentine');
         else if (m === 1 && d === 1) setActiveFestival('newyear');
+        
+        // 检查是否需要显示每日情话（一天只显示一次）
+        const lastQuoteDate = localStorage.getItem('jq_lastQuoteDate');
+        const today = now.toDateString();
+        
+        if (lastQuoteDate !== today) {
+            // 检查是否是特殊日子
+            const specialQuote = checkSpecialDay();
+            if (specialQuote) {
+                setDailyQuote(specialQuote);
+            } else {
+                // 随机选择一句情话
+                const quotes = LOVE_QUOTES[settings.language];
+                const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+                setDailyQuote({ text: randomQuote.text, author: randomQuote.author });
+            }
+            setShowDailyQuote(true);
+            localStorage.setItem('jq_lastQuoteDate', today);
+        }
     }, []);
+    
+    // 检查是否是特殊日子（节日或纪念日）
+    const checkSpecialDay = () => {
+        const now = new Date();
+        const m = now.getMonth() + 1;
+        const d = now.getDate();
+        
+        // 检查节日
+        if (m === 2 && d === 14) {
+            return { 
+                ...FESTIVAL_WISHES.valentine[settings.language], 
+                isSpecial: true, 
+                type: 'festival' as const 
+            };
+        }
+        if (m === 1 && d === 1) {
+            return { 
+                ...FESTIVAL_WISHES.newyear[settings.language], 
+                isSpecial: true, 
+                type: 'festival' as const 
+            };
+        }
+        
+        // 检查是否是纪念日（今天）
+        const today = now.toISOString().split('T')[0];
+        const todayAnniversary = anniversaries.find(a => {
+            const annivDate = new Date(a.date);
+            return annivDate.getMonth() === now.getMonth() && annivDate.getDate() === now.getDate();
+        });
+        
+        if (todayAnniversary) {
+            const isBirthday = todayAnniversary.category === 'birthday';
+            const wish = isBirthday ? FESTIVAL_WISHES.birthday[settings.language] : FESTIVAL_WISHES.anniversary[settings.language];
+            return { 
+                text: `${todayAnniversary.name}：${wish.text}`, 
+                title: wish.title,
+                isSpecial: true, 
+                type: 'anniversary' as const 
+            };
+        }
+        
+        return null;
+    };
 
 
 
@@ -723,7 +845,16 @@ function App() {
 
     return (
         <>
-            {isAppLoading && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
+            {/* 每日情话弹窗 - 在启动页之前显示 */}
+            {showDailyQuote && dailyQuote && (
+                <DailyQuoteModal 
+                    quote={dailyQuote} 
+                    onClose={() => setShowDailyQuote(false)}
+                    language={settings.language}
+                />
+            )}
+            
+            {isAppLoading && !showDailyQuote && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
             {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
             <div className={`app-container ${appReady ? 'fade-in-ready' : ''}`}>
                 
@@ -1574,6 +1705,143 @@ function AnniversaryView({ t, anniversaries, setAnniversaries, setView }: any) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// 每日情话弹窗组件
+function DailyQuoteModal({ quote, onClose, language }: { quote: {text: string, author?: string, title?: string, isSpecial?: boolean}, onClose: () => void, language: 'zh' | 'en' }) {
+    const [fadeOut, setFadeOut] = useState(false);
+    
+    const handleClose = () => {
+        setFadeOut(true);
+        setTimeout(onClose, 400);
+    };
+    
+    return (
+        <div 
+            className={`daily-quote-overlay ${fadeOut ? 'fade-out' : ''}`} 
+            onClick={handleClose}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.5)',
+                backdropFilter: 'blur(15px)',
+                zIndex: 15000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px',
+                animation: 'fadeIn 0.5s ease-out'
+            }}
+        >
+            <div 
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: quote.isSpecial 
+                        ? 'linear-gradient(135deg, #FF6B9D 0%, #C44569 100%)' 
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '28px',
+                    padding: '40px 32px',
+                    width: '100%',
+                    maxWidth: '360px',
+                    boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    animation: 'quotePop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                }}
+            >
+                {/* 装饰元素 */}
+                <div style={{ 
+                    position: 'absolute', 
+                    top: -30, 
+                    right: -30, 
+                    fontSize: 100, 
+                    opacity: 0.1,
+                    transform: 'rotate(15deg)'
+                }}>
+                    {quote.isSpecial ? (quote.title?.includes('生日') ? '🎂' : quote.title?.includes('新年') ? '🎆' : '❤️') : '💕'}
+                </div>
+                
+                {/* 标题 */}
+                {quote.title && (
+                    <h2 style={{
+                        color: 'white',
+                        fontSize: '22px',
+                        fontWeight: '800',
+                        margin: '0 0 20px',
+                        textShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                    }}>
+                        {quote.title}
+                    </h2>
+                )}
+                
+                {/* 分隔线 */}
+                {quote.title && (
+                    <div style={{
+                        width: '60px',
+                        height: '3px',
+                        background: 'rgba(255,255,255,0.3)',
+                        margin: '0 auto 24px',
+                        borderRadius: '2px'
+                    }} />
+                )}
+                
+                {/* 情话内容 */}
+                <p style={{
+                    color: 'white',
+                    fontSize: '18px',
+                    lineHeight: '1.8',
+                    margin: '0 0 20px',
+                    fontWeight: '500',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                    「{quote.text}」
+                </p>
+                
+                {/* 作者 */}
+                {quote.author && (
+                    <p style={{
+                        color: 'rgba(255,255,255,0.8)',
+                        fontSize: '14px',
+                        margin: '0 0 32px',
+                        fontStyle: 'italic'
+                    }}>
+                        —— {quote.author}
+                    </p>
+                )}
+                
+                {/* 提示文字 */}
+                <p style={{
+                    color: 'rgba(255,255,255,0.6)',
+                    fontSize: '12px',
+                    margin: '0 0 20px'
+                }}>
+                    {language === 'zh' ? '点击任意处开始美好的一天 ✨' : 'Tap anywhere to start a wonderful day ✨'}
+                </p>
+                
+                {/* 关闭按钮 */}
+                <button
+                    onClick={handleClose}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        border: 'none',
+                        borderRadius: '16px',
+                        padding: '14px 32px',
+                        color: 'white',
+                        fontSize: '15px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                >
+                    {language === 'zh' ? '开启今日份心动' : 'Start Today'}
+                </button>
+            </div>
         </div>
     );
 }
