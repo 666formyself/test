@@ -101,7 +101,10 @@ const TRANSLATIONS = {
             fixedReminder: '每日定点提醒',
             fixedTime: '提醒时刻',
             report: '统计报告', share: '分享成功', message: '消息中心',
-            intensity: { strong: '强', medium: '中', weak: '弱', off: '关闭' }
+            intensity: { strong: '强', medium: '中', weak: '弱', off: '关闭' },
+            permissionDenied: '通知权限被拒绝，请在浏览器设置中手动开启',
+            enableNotification: '开启通知权限',
+            notificationDesc: '允许发送打卡提醒和节日祝福'
         },
         anniv: {
             title: '小岁月的记录', add: '记下一刻', name: '在这个日子...', date: '选择日期',
@@ -170,7 +173,10 @@ const TRANSLATIONS = {
             fixedReminder: 'Daily Fixed Reminder',
             fixedTime: 'Reminder Time',
             report: 'Report Notify', share: 'Share Notify', message: 'Message Center',
-            intensity: { strong: 'High', medium: 'Med', weak: 'Weak', off: 'Off' }
+            intensity: { strong: 'High', medium: 'Med', weak: 'Weak', off: 'Off' },
+            permissionDenied: 'Notification permission denied. Please enable it in browser settings.',
+            enableNotification: 'Enable Notifications',
+            notificationDesc: 'Allow check-in reminders and festival greetings'
         },
         anniv: {
             title: 'Memory Lane', add: 'Record Moment', name: 'On this day...', date: 'Pick Date',
@@ -204,12 +210,50 @@ const safeVibrate = (pattern: number[]) => {
     }
 };
 
-const triggerNotification = (title: string, body: string) => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        try {
+// 通过 Service Worker 发送通知（支持后台推送）
+const triggerNotification = async (title: string, body: string, tag?: string) => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    
+    try {
+        // 检查 Service Worker 是否可用
+        if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification(title, {
+                body,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
+                badge: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
+                tag: tag || 'checkin-reminder',
+                requireInteraction: false,
+                vibrate: [200, 100, 200]
+            });
+        } else {
+            // 降级方案：如果 SW 不可用，使用传统通知
             new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' });
-        } catch (e) { }
+        }
+    } catch (e) { 
+        console.error('通知发送失败:', e);
     }
+};
+
+// 请求通知权限
+const requestNotificationPermission = async (): Promise<boolean> => {
+    if (typeof Notification === 'undefined') {
+        console.log('浏览器不支持通知 API');
+        return false;
+    }
+    
+    if (Notification.permission === 'granted') {
+        return true;
+    }
+    
+    if (Notification.permission === 'denied') {
+        console.log('通知权限已被拒绝');
+        return false;
+    }
+    
+    // 请求权限
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
 };
 
 const HomeIcon = ({ active }: { active: boolean }) => (
@@ -386,38 +430,66 @@ function App() {
         else if (m === 1 && d === 1) setActiveFestival('newyear');
     }, []);
 
+    // 检查是否在免打扰时段
+    const isInDND = (timeStr: string, dndStart: string, dndEnd: string): boolean => {
+        if (dndStart < dndEnd) {
+            return timeStr >= dndStart && timeStr <= dndEnd;
+        }
+        // 跨午夜的情况（如 23:00 - 07:00）
+        return timeStr >= dndStart || timeStr <= dndEnd;
+    };
+
     useEffect(() => {
-        const checkReminders = () => {
+        let interval: NodeJS.Timeout;
+        
+        const checkReminders = async () => {
+            // 确保权限已授予
             if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+            
             const now = new Date();
             const hour = now.getHours();
             const min = now.getMinutes();
             const timeStr = `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
             const todayKey = now.toDateString();
+            const currentMinute = `${hour}:${min}`; // 用于精确匹配
 
+            // 每日定点提醒
             if (settings.reminders.fixedReminderEnabled) {
-                if (timeStr === settings.reminders.fixedReminderTime && lastFixedNotifDay.current !== todayKey) {
-                    triggerNotification(t.notif.dailyTitle, t.notif.dailyBody);
-                    lastFixedNotifDay.current = todayKey;
-                    if (settings.vibration) safeVibrate([200, 100, 200]);
+                const reminderTime = settings.reminders.fixedReminderTime;
+                const [reminderHour, reminderMin] = reminderTime.split(':').map(Number);
+                const reminderMinuteStr = `${reminderHour}:${reminderMin}`;
+                
+                // 只在设定的时间点触发（精确到分钟）
+                if (currentMinute === reminderMinuteStr && lastFixedNotifDay.current !== todayKey) {
+                    // 检查免打扰
+                    if (!isInDND(timeStr, settings.reminders.dndStart, settings.reminders.dndEnd)) {
+                        await triggerNotification(t.notif.dailyTitle, t.notif.dailyBody, 'daily-reminder');
+                        lastFixedNotifDay.current = todayKey;
+                        if (settings.vibration) safeVibrate([200, 100, 200]);
+                    }
                 }
             }
 
+            // 打卡提醒（整点检查，每小时一次）
             if (settings.reminders.checkInEnabled && min === 0) {
-                const isDND = settings.reminders.dndStart < settings.reminders.dndEnd 
-                    ? (timeStr >= settings.reminders.dndStart && timeStr <= settings.reminders.dndEnd)
-                    : (timeStr >= settings.reminders.dndStart || timeStr <= settings.reminders.dndEnd);
+                if (isInDND(timeStr, settings.reminders.dndStart, settings.reminders.dndEnd)) return;
                 
-                if (isDND) return;
                 const todayTimestamp = new Date().setHours(0,0,0,0);
                 const hasTodayCheckin = records.some(r => new Date(r.timestamp).setHours(0,0,0,0) === todayTimestamp);
+                
                 if (!hasTodayCheckin) {
-                    triggerNotification(t.notif.title, t.notif.body);
+                    await triggerNotification(t.notif.title, t.notif.body, 'checkin-reminder');
                     if (settings.vibration) safeVibrate([200, 100, 200]);
                 }
             }
         };
-        const interval = setInterval(checkReminders, 60000);
+        
+        // 每分钟检查一次
+        interval = setInterval(checkReminders, 60000);
+        
+        // 立即检查一次（页面加载时）
+        checkReminders();
+        
         return () => clearInterval(interval);
     }, [settings.reminders, records, t, settings.vibration]);
 
@@ -672,6 +744,26 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
     const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
     const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
     const [guideType, setGuideType] = useState<'ios' | 'quark' | 'default' | null>(null);
+    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+
+    // 检查通知权限状态
+    useEffect(() => {
+        if (typeof Notification === 'undefined') {
+            setNotifPermission('unsupported');
+        } else {
+            setNotifPermission(Notification.permission);
+        }
+    }, []);
+
+    // 请求通知权限
+    const handleRequestPermission = async () => {
+        const granted = await requestNotificationPermission();
+        setNotifPermission(granted ? 'granted' : 'denied');
+        if (granted) {
+            // 发送测试通知
+            await triggerNotification('权限已开启', '您已成功开启通知权限，打卡提醒将准时送达！✨', 'test-notification');
+        }
+    };
 
     const handleInstall = async () => {
         if (deferredPrompt) {
@@ -721,12 +813,21 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             </div>
                         </div>
                         <div className="setting-right">
-                            <label className="switch">
-                                <input type="checkbox" checked={settings.darkModeType === 'system'} onChange={e => update({ darkModeType: e.target.checked ? 'system' : 'manual' })} />
-                                <span className="slider-round"></span>
-                            </label>
+                            <div className="pill-group">
+                                <button className={settings.darkModeType === 'system' ? 'pill active' : 'pill'} onClick={() => update({ darkModeType: 'system' })}>{t.followSystem}</button>
+                                <button className={settings.darkModeType === 'manual' ? 'pill active' : 'pill'} onClick={() => update({ darkModeType: 'manual' })}>{t.manualControl}</button>
+                            </div>
                         </div>
                     </div>
+
+                    {settings.darkModeType === 'manual' && (
+                        <div className="setting-row" style={{ marginTop: 6 }}>
+                            <div className="setting-left"></div>
+                            <div className="setting-right">
+                                <label className="switch"><input type="checkbox" checked={!!settings.manualDarkMode} onChange={e => update({ manualDarkMode: e.target.checked })} /><span className="slider-round"></span></label>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="divider" />
 
@@ -746,16 +847,61 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
 
                 <div className="settings-card-new">
                     <div className="section-label">{t.reminder.title}</div>
+                    
+                    {/* 通知权限请求按钮 */}
+                    {notifPermission !== 'granted' && (
+                        <div className="setting-row" style={{background: 'rgba(255, 182, 163, 0.15)', borderRadius: '16px', marginBottom: '12px', padding: '16px'}}>
+                            <div className="setting-left">
+                                <div className="icon-circle" style={{background: '#FFB6A3'}}>🔔</div>
+                                <div>
+                                    <div className="setting-title" style={{color: '#FF8A65', fontWeight: '800'}}>
+                                        {notifPermission === 'denied' ? t.reminder.permissionDenied.split('。')[0] : t.reminder.enableNotification}
+                                    </div>
+                                    <div className="setting-desc">
+                                        {notifPermission === 'denied' 
+                                            ? t.reminder.permissionDenied
+                                            : t.reminder.notificationDesc}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="setting-right">
+                                {notifPermission !== 'denied' && (
+                                    <button 
+                                        className="setting-action-btn" 
+                                        onClick={handleRequestPermission}
+                                        style={{background: '#FFB6A3', color: 'white'}}
+                                    >
+                                        {t.reminder.goAuth}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="setting-row">
                         <div className="setting-left">
                             <div className="icon-circle">⏰</div>
                             <div>
                                 <div className="setting-title">{t.reminder.checkIn}</div>
-                                <div className="setting-desc">{(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? t.reminder.granted : t.reminder.authNeeded}</div>
+                                <div className="setting-desc">{notifPermission === 'granted' ? t.reminder.granted : t.reminder.authNeeded}</div>
                             </div>
                         </div>
                         <div className="setting-right">
-                            <label className="switch"><input type="checkbox" checked={settings.reminders.checkInEnabled} onChange={e => updateReminders({ checkInEnabled: e.target.checked })} /><span className="slider-round"></span></label>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={settings.reminders.checkInEnabled && notifPermission === 'granted'} 
+                                    onChange={e => {
+                                        if (notifPermission !== 'granted') {
+                                            handleRequestPermission();
+                                            return;
+                                        }
+                                        updateReminders({ checkInEnabled: e.target.checked });
+                                    }} 
+                                    disabled={notifPermission !== 'granted'}
+                                />
+                                <span className="slider-round"></span>
+                            </label>
                         </div>
                     </div>
 
@@ -770,7 +916,21 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                             </div>
                         </div>
                         <div className="setting-right">
-                            <label className="switch"><input type="checkbox" checked={settings.reminders.fixedReminderEnabled} onChange={e => updateReminders({ fixedReminderEnabled: e.target.checked })} /><span className="slider-round"></span></label>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={settings.reminders.fixedReminderEnabled && notifPermission === 'granted'} 
+                                    onChange={e => {
+                                        if (notifPermission !== 'granted') {
+                                            handleRequestPermission();
+                                            return;
+                                        }
+                                        updateReminders({ fixedReminderEnabled: e.target.checked });
+                                    }}
+                                    disabled={notifPermission !== 'granted'}
+                                />
+                                <span className="slider-round"></span>
+                            </label>
                         </div>
                     </div>
 

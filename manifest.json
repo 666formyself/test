@@ -1,0 +1,28 @@
+{
+  "name": "佳倩管家",
+  "short_name": "佳倩管家",
+  "description": "私人生活助理 · 记录温暖的小日子",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FFB6A3",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/256/3063/3063822.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/128/3063/3063822.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}
