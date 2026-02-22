@@ -144,6 +144,27 @@ const TRANSLATIONS = {
         categories: {
             cardio: '有氧训练', strength: '塑形力量', flexibility: '柔韧伸展',
             habits: '自律习惯', mind: '精神寄托', daily: '日常事务', custom: '自定义'
+        },
+        chef: {
+            title: '佳倩小厨',
+            whatToEat: '今天吃什么',
+            menu: '点菜菜单',
+            randomDecide: '随机决定',
+            style: '风格偏好',
+            chinese: '中餐',
+            western: '西餐',
+            noodle: '面食',
+            rice: '米饭',
+            cuisine: '菜系',
+            place: '用餐地点',
+            cafeteria: '食堂',
+            delivery: '外卖',
+            dineOut: '出去吃',
+            result: '今日推荐',
+            tryAgain: '再试一次',
+            startRandom: '开始随机',
+            selectPreferences: '先选择你的偏好',
+            menuComingSoon: '点菜功能即将上线，敬请期待！'
         }
     },
     en: {
@@ -233,6 +254,27 @@ const TRANSLATIONS = {
         categories: {
             cardio: 'Cardio', strength: 'Strength', flexibility: 'Flexibility',
             habits: 'Habits', mind: 'Mind', daily: 'Daily', custom: 'Custom'
+        },
+        chef: {
+            title: 'Chef Jiaqian',
+            whatToEat: 'What to Eat',
+            menu: 'Menu',
+            randomDecide: 'Random Pick',
+            style: 'Style',
+            chinese: 'Chinese',
+            western: 'Western',
+            noodle: 'Noodle',
+            rice: 'Rice',
+            cuisine: 'Cuisine',
+            place: 'Location',
+            cafeteria: 'Cafeteria',
+            delivery: 'Delivery',
+            dineOut: 'Dine Out',
+            result: 'Today\'s Pick',
+            tryAgain: 'Try Again',
+            startRandom: 'Start',
+            selectPreferences: 'Select your preferences',
+            menuComingSoon: 'Menu feature coming soon!'
         }
     }
 };
@@ -505,7 +547,7 @@ const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, on
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
-    const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary'>('home');
+    const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary' | 'chef'>('home');
     const [showDailyQuote, setShowDailyQuote] = useState(false);
     const [dailyQuote, setDailyQuote] = useState<{text: string, author?: string, isSpecial?: boolean, type?: 'festival' | 'anniversary'} | null>(null);
     const [checkinSubTab, setCheckinSubTab] = useState<'sport' | 'event'>('sport');
@@ -785,7 +827,7 @@ function App() {
                 
                 <Clock lang={settings.language} />
 
-                <div className="home-action-grid">
+                <div className="home-action-grid" style={{gridTemplateColumns: 'repeat(2, 1fr)'}}>
                     <div className="action-card h-card-1" onClick={() => setView('checkin')}>
                         <div className="action-icon">👟</div>
                         <div className="action-label">{t.checkin}</div>
@@ -797,6 +839,10 @@ function App() {
                     <div className="action-card h-card-4" onClick={() => setView('stats')}>
                         <div className="action-icon">📊</div>
                         <div className="action-label">{t.stats}</div>
+                    </div>
+                    <div className="action-card h-card-chef" onClick={() => setView('chef')}>
+                        <div className="action-icon">🍳</div>
+                        <div className="action-label">{t.chef?.title || '佳倩小厨'}</div>
                     </div>
                 </div>
 
@@ -902,6 +948,7 @@ function App() {
                     {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                     {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
                     {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
+                    {view === 'chef' && <ChefView t={t} setView={setView} />}
                 </main>
                 <nav className="bottom-nav">
                     <button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}>
@@ -1621,6 +1668,368 @@ function ShareCard({ data, onClose, t }: { data: any, onClose: () => void, t: an
                         关闭
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// 佳倩小厨组件
+function ChefView({ t, setView }: any) {
+    const [activeTab, setActiveTab] = useState<'random' | 'menu'>('random');
+    const [preferences, setPreferences] = useState({
+        style: '', // 'chinese' | 'western'
+        type: '',  // 'noodle' | 'rice'
+        cuisine: '', // 'sichuan' | 'cantonese' | 'japanese' | 'italian' | etc
+        place: ''  // 'cafeteria' | 'delivery' | 'dineOut'
+    });
+    const [result, setResult] = useState<string | null>(null);
+    const [isRandomizing, setIsRandomizing] = useState(false);
+
+    const foodDatabase = {
+        chinese: {
+            noodle: ['兰州拉面', '重庆小面', '武汉热干面', '北京炸酱面', '山西刀削面', '四川担担面', '河南烩面', '阳春面'],
+            rice: ['黄焖鸡米饭', '卤肉饭', '煲仔饭', '盖浇饭', '炒饭', '粥品', '饺子', '小笼包']
+        },
+        western: {
+            noodle: ['意大利面', '日式拉面', '韩式炸酱面', '越南河粉', '泰式炒河粉'],
+            rice: ['咖喱饭', '韩式拌饭', '日式丼饭', '西班牙海鲜饭', ' risotto']
+        }
+    };
+
+    const cuisineNames: Record<string, string> = {
+        sichuan: '川菜', cantonese: '粤菜', jiangsu: '苏菜', shandong: '鲁菜',
+        hunan: '湘菜', zhejiang: '浙菜', fujian: '闽菜', anhui: '徽菜',
+        japanese: '日料', korean: '韩餐', italian: '意餐', french: '法餐',
+        american: '美式', thai: '泰餐', vietnamese: '越南菜'
+    };
+
+    const placeEmojis: Record<string, string> = {
+        cafeteria: '🏢', delivery: '🛵', dineOut: '🚶'
+    };
+
+    const handleRandom = () => {
+        setIsRandomizing(true);
+        setResult(null);
+        
+        // 模拟随机过程动画
+        let count = 0;
+        const interval = setInterval(() => {
+            count++;
+            if (count > 10) {
+                clearInterval(interval);
+                generateResult();
+                setIsRandomizing(false);
+            }
+        }, 100);
+    };
+
+    const generateResult = () => {
+        let candidates: string[] = [];
+        
+        // 根据偏好筛选
+        if (preferences.style === 'chinese') {
+            candidates = [...foodDatabase.chinese.noodle, ...foodDatabase.chinese.rice];
+        } else if (preferences.style === 'western') {
+            candidates = [...foodDatabase.western.noodle, ...foodDatabase.western.rice];
+        } else {
+            candidates = [
+                ...foodDatabase.chinese.noodle, ...foodDatabase.chinese.rice,
+                ...foodDatabase.western.noodle, ...foodDatabase.western.rice
+            ];
+        }
+
+        // 如果指定了面/饭类型，简单过滤
+        if (preferences.type === 'noodle') {
+            candidates = candidates.filter(f => 
+                foodDatabase.chinese.noodle.includes(f) || 
+                foodDatabase.western.noodle.includes(f)
+            );
+        } else if (preferences.type === 'rice') {
+            candidates = candidates.filter(f => 
+                foodDatabase.chinese.rice.includes(f) || 
+                foodDatabase.western.rice.includes(f)
+            );
+        }
+
+        // 随机选择
+        const randomFood = candidates[Math.floor(Math.random() * candidates.length)];
+        
+        let placeText = '';
+        if (preferences.place) {
+            const placeMap: Record<string, string> = {
+                cafeteria: t.chef?.cafeteria || '食堂',
+                delivery: t.chef?.delivery || '外卖',
+                dineOut: t.chef?.dineOut || '出去吃'
+            };
+            placeText = ` (${placeEmojis[preferences.place]} ${placeMap[preferences.place]})`;
+        }
+
+        setResult(randomFood + placeText);
+    };
+
+    const cuisineOptions = [
+        { key: 'sichuan', label: '川菜 🔥' },
+        { key: 'cantonese', label: '粤菜 🥟' },
+        { key: 'jiangsu', label: '苏菜 🍲' },
+        { key: 'shandong', label: '鲁菜 🥟' },
+        { key: 'hunan', label: '湘菜 🌶️' },
+        { key: 'japanese', label: '日料 🍣' },
+        { key: 'korean', label: '韩餐 🍜' },
+        { key: 'italian', label: '意餐 🍝' }
+    ];
+
+    return (
+        <div className="view">
+            <div className="sub-header">
+                <button onClick={() => setView('home')} className="back-btn"><BackArrow /></button>
+                <h2>👨‍🍳 {t.chef?.title || '佳倩小厨'}</h2>
+            </div>
+
+            {/* Tab 切换 */}
+            <div className="subtab-container" style={{ marginBottom: '20px' }}>
+                <div className={`subtab-slider ${activeTab === 'menu' ? 'right' : ''}`}></div>
+                <button 
+                    className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} 
+                    onClick={() => setActiveTab('random')}
+                >
+                    🎲 {t.chef?.whatToEat || '今天吃什么'}
+                </button>
+                <button 
+                    className={`tab-btn ${activeTab === 'menu' ? 'active' : ''}`} 
+                    onClick={() => setActiveTab('menu')}
+                >
+                    📋 {t.chef?.menu || '点菜菜单'}
+                </button>
+            </div>
+
+            <div style={{ padding: '0 20px' }}>
+                {activeTab === 'random' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 偏好选择区域 */}
+                        {!result && (
+                            <>
+                                {/* 风格选择 */}
+                                <div className="settings-card-new">
+                                    <div className="section-label">🍜 {t.chef?.style || '风格'}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <button
+                                            onClick={() => setPreferences(p => ({ ...p, style: p.style === 'chinese' ? '' : 'chinese' }))}
+                                            style={{
+                                                padding: '14px',
+                                                borderRadius: '14px',
+                                                border: '2px solid',
+                                                borderColor: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--border-color)',
+                                                background: preferences.style === 'chinese' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                color: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--text-main)',
+                                                fontWeight: 700,
+                                                fontSize: '14px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            🥢 {t.chef?.chinese || '中餐'}
+                                        </button>
+                                        <button
+                                            onClick={() => setPreferences(p => ({ ...p, style: p.style === 'western' ? '' : 'western' }))}
+                                            style={{
+                                                padding: '14px',
+                                                borderRadius: '14px',
+                                                border: '2px solid',
+                                                borderColor: preferences.style === 'western' ? 'var(--accent)' : 'var(--border-color)',
+                                                background: preferences.style === 'western' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                color: preferences.style === 'western' ? 'var(--accent)' : 'var(--text-main)',
+                                                fontWeight: 700,
+                                                fontSize: '14px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            🍴 {t.chef?.western || '西餐'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 面/饭选择 */}
+                                <div className="settings-card-new">
+                                    <div className="section-label">🍚 {t.chef?.type === 'undefined' ? '主食' : '主食'}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <button
+                                            onClick={() => setPreferences(p => ({ ...p, type: p.type === 'noodle' ? '' : 'noodle' }))}
+                                            style={{
+                                                padding: '14px',
+                                                borderRadius: '14px',
+                                                border: '2px solid',
+                                                borderColor: preferences.type === 'noodle' ? 'var(--accent)' : 'var(--border-color)',
+                                                background: preferences.type === 'noodle' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                color: preferences.type === 'noodle' ? 'var(--accent)' : 'var(--text-main)',
+                                                fontWeight: 700,
+                                                fontSize: '14px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            🍜 {t.chef?.noodle || '面食'}
+                                        </button>
+                                        <button
+                                            onClick={() => setPreferences(p => ({ ...p, type: p.type === 'rice' ? '' : 'rice' }))}
+                                            style={{
+                                                padding: '14px',
+                                                borderRadius: '14px',
+                                                border: '2px solid',
+                                                borderColor: preferences.type === 'rice' ? 'var(--accent)' : 'var(--border-color)',
+                                                background: preferences.type === 'rice' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                color: preferences.type === 'rice' ? 'var(--accent)' : 'var(--text-main)',
+                                                fontWeight: 700,
+                                                fontSize: '14px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            🍚 {t.chef?.rice || '米饭'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 用餐地点 */}
+                                <div className="settings-card-new">
+                                    <div className="section-label">📍 {t.chef?.place || '用餐地点'}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                                        {[
+                                            { key: 'cafeteria', icon: '🏢', label: t.chef?.cafeteria || '食堂' },
+                                            { key: 'delivery', icon: '🛵', label: t.chef?.delivery || '外卖' },
+                                            { key: 'dineOut', icon: '🚶', label: t.chef?.dineOut || '出去吃' }
+                                        ].map(({ key, icon, label }) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setPreferences(p => ({ 
+                                                    ...p, 
+                                                    place: p.place === key ? '' : key 
+                                                }))}
+                                                style={{
+                                                    padding: '12px 8px',
+                                                    borderRadius: '12px',
+                                                    border: '2px solid',
+                                                    borderColor: preferences.place === key ? 'var(--accent)' : 'var(--border-color)',
+                                                    background: preferences.place === key ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                    color: preferences.place === key ? 'var(--accent)' : 'var(--text-main)',
+                                                    fontWeight: 700,
+                                                    fontSize: '13px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '20px' }}>{icon}</span>
+                                                <span>{label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 开始按钮 */}
+                                <button
+                                    onClick={handleRandom}
+                                    disabled={isRandomizing}
+                                    className="btn-confirm highlight glow"
+                                    style={{
+                                        height: '56px',
+                                        fontSize: '18px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    {isRandomizing ? (
+                                        <><span className="spin">🎲</span> 正在决定...</>
+                                    ) : (
+                                        <><span>🎲</span> {t.chef?.startRandom || '开始随机'}</>
+                                    )}
+                                </button>
+                            </>
+                        )}
+
+                        {/* 结果显示 */}
+                        {result && (
+                            <div 
+                                className="settings-card-new"
+                                style={{
+                                    background: 'linear-gradient(135deg, var(--card-orange) 0%, #FFF8F3 100%)',
+                                    textAlign: 'center',
+                                    padding: '40px 24px',
+                                    animation: 'quotePop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                                }}
+                            >
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+                                <div style={{ 
+                                    fontSize: '13px', 
+                                    color: 'var(--text-soft)', 
+                                    marginBottom: '8px',
+                                    fontWeight: 600
+                                }}>
+                                    {t.chef?.result || '今日推荐'}
+                                </div>
+                                <div style={{ 
+                                    fontSize: '28px', 
+                                    fontWeight: 800, 
+                                    color: 'var(--text-main)',
+                                    marginBottom: '24px',
+                                    lineHeight: 1.4
+                                }}>
+                                    {result}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setResult(null);
+                                        setPreferences({ style: '', type: '', cuisine: '', place: '' });
+                                    }}
+                                    className="btn-confirm"
+                                    style={{
+                                        background: 'var(--card-bg)',
+                                        color: 'var(--text-main)',
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.06)'
+                                    }}
+                                >
+                                    🔄 {t.chef?.tryAgain || '再试一次'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    /* 点菜菜单 - 预留端口 */
+                    <div 
+                        className="settings-card-new"
+                        style={{
+                            textAlign: 'center',
+                            padding: '60px 24px',
+                            background: 'linear-gradient(135deg, var(--card-blue) 0%, #F8FBFF 100%)'
+                        }}
+                    >
+                        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📋</div>
+                        <h3 style={{ margin: '0 0 12px', fontSize: '20px', fontWeight: 800 }}>
+                            {t.chef?.menu || '点菜菜单'}
+                        </h3>
+                        <p style={{ 
+                            color: 'var(--text-soft)', 
+                            margin: '0 0 24px',
+                            fontSize: '15px',
+                            lineHeight: 1.6
+                        }}>
+                            {t.chef?.menuComingSoon || '点菜功能即将上线，敬请期待！'}
+                        </p>
+                        <div style={{
+                            padding: '12px 24px',
+                            background: 'var(--accent-light)',
+                            borderRadius: '12px',
+                            display: 'inline-block',
+                            color: 'var(--accent)',
+                            fontWeight: 700,
+                            fontSize: '14px'
+                        }}>
+                            🚧 开发中...
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

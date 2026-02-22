@@ -182,6 +182,9 @@ body {
 .h-card-1 { background: var(--card-orange); }
 .h-card-3 { background: var(--card-pink); }
 .h-card-4 { background: var(--card-blue); }
+.h-card-chef { 
+    background: linear-gradient(135deg, #FFE5B4 0%, #FFD4A3 100%);
+}
 
 .action-icon { font-size: 32px; }
 
@@ -1197,6 +1200,17 @@ input:checked + .slider-round:before { transform: translateX(20px); }
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* 旋转动画 */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
 }
 
 /* 每日情话弹窗动画 */
