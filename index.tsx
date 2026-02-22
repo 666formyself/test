@@ -1910,7 +1910,7 @@ function ChefView({ t, setView }: any) {
             </div>
 
             <div style={{ padding: '0 20px' }}>
-                {activeTab === 'random' ? (
+                {activeTab === 'random' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* 偏好选择区域 */}
                         {!result && (
