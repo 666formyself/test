@@ -182,9 +182,7 @@ body {
 .h-card-1 { background: var(--card-orange); }
 .h-card-3 { background: var(--card-pink); }
 .h-card-4 { background: var(--card-blue); }
-.h-card-chef { 
-    background: linear-gradient(135deg, #FFE5B4 0%, #FFD4A3 100%);
-}
+.h-card-chef { background: linear-gradient(135deg, #FFE5B4 0%, #FFD4A3 100%); }
 
 .action-icon { font-size: 32px; }
 
@@ -1235,4 +1233,137 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 .daily-quote-overlay.fade-out {
     opacity: 0;
     pointer-events: none;
+}
+
+/* 三 Tab 滑块支持 */
+.subtab-container.three-tab .subtab-slider {
+    width: calc(33.333% - 4px);
+}
+
+.subtab-slider.middle {
+    transform: translateX(100%);
+}
+
+.subtab-slider.right {
+    transform: translateX(200%);
+}
+
+/* 菜系选择网格 */
+.cuisine-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.cuisine-btn {
+    padding: 12px 8px;
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    background: var(--card-bg);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cuisine-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+@media (max-width: 380px) {
+    .cuisine-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* 自定义选项输入框样式 */
+.custom-option-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.custom-option-input input {
+    flex: 1;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 2px solid var(--border-color);
+    background: var(--card-bg);
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--text-main);
+    transition: all 0.2s;
+}
+
+.custom-option-input input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-light);
+}
+
+.custom-option-input .remove-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #FFE5E5;
+    color: #FF3B30;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.custom-option-input .remove-btn:hover {
+    background: #FF3B30;
+    color: white;
+}
+
+/* 添加选项按钮 */
+.add-option-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: 2px dashed var(--border-color);
+    background: transparent;
+    color: var(--text-soft);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.add-option-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* 自定义结果展示 */
+.custom-result {
+    background: linear-gradient(135deg, var(--card-pink) 0%, #FFF8FA 100%);
+    border-radius: 24px;
+    padding: 40px 24px;
+    text-align: center;
+    animation: quotePop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.custom-result-text {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 20px 0;
+    line-height: 1.4;
 }

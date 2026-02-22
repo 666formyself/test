@@ -149,6 +149,7 @@ const TRANSLATIONS = {
             title: '佳倩小厨',
             whatToEat: '今天吃什么',
             menu: '点菜菜单',
+            custom: '帮我选',
             randomDecide: '随机决定',
             style: '风格偏好',
             chinese: '中餐',
@@ -164,7 +165,14 @@ const TRANSLATIONS = {
             tryAgain: '再试一次',
             startRandom: '开始随机',
             selectPreferences: '先选择你的偏好',
-            menuComingSoon: '点菜功能即将上线，敬请期待！'
+            menuComingSoon: '点菜功能即将上线，敬请期待！',
+            customTitle: '输入你的选项',
+            customDesc: '不知道选哪个？让我来帮你决定！',
+            option: '选项',
+            addOption: '添加选项',
+            helpMeChoose: '帮我选',
+            deciding: '决定中...',
+            needTwoOptions: '请至少输入两个选项'
         }
     },
     en: {
@@ -259,6 +267,7 @@ const TRANSLATIONS = {
             title: 'Chef Jiaqian',
             whatToEat: 'What to Eat',
             menu: 'Menu',
+            custom: 'Help Me Choose',
             randomDecide: 'Random Pick',
             style: 'Style',
             chinese: 'Chinese',
@@ -274,7 +283,14 @@ const TRANSLATIONS = {
             tryAgain: 'Try Again',
             startRandom: 'Start',
             selectPreferences: 'Select your preferences',
-            menuComingSoon: 'Menu feature coming soon!'
+            menuComingSoon: 'Menu feature coming soon!',
+            customTitle: 'Enter Your Options',
+            customDesc: 'Can\'t decide? Let me help you!',
+            option: 'Option',
+            addOption: 'Add Option',
+            helpMeChoose: 'Help Me Choose',
+            deciding: 'Deciding...',
+            needTwoOptions: 'Please enter at least two options'
         }
     }
 };
@@ -1675,7 +1691,7 @@ function ShareCard({ data, onClose, t }: { data: any, onClose: () => void, t: an
 
 // 佳倩小厨组件
 function ChefView({ t, setView }: any) {
-    const [activeTab, setActiveTab] = useState<'random' | 'menu'>('random');
+    const [activeTab, setActiveTab] = useState<'random' | 'custom' | 'menu'>('random');
     const [preferences, setPreferences] = useState({
         style: '', // 'chinese' | 'western'
         type: '',  // 'noodle' | 'rice'
@@ -1684,16 +1700,53 @@ function ChefView({ t, setView }: any) {
     });
     const [result, setResult] = useState<string | null>(null);
     const [isRandomizing, setIsRandomizing] = useState(false);
+    
+    // 自定义随机功能
+    const [customOptions, setCustomOptions] = useState<string[]>(['', '']);
+    const [customResult, setCustomResult] = useState<string | null>(null);
 
-    const foodDatabase = {
-        chinese: {
-            noodle: ['兰州拉面', '重庆小面', '武汉热干面', '北京炸酱面', '山西刀削面', '四川担担面', '河南烩面', '阳春面'],
-            rice: ['黄焖鸡米饭', '卤肉饭', '煲仔饭', '盖浇饭', '炒饭', '粥品', '饺子', '小笼包']
-        },
-        western: {
-            noodle: ['意大利面', '日式拉面', '韩式炸酱面', '越南河粉', '泰式炒河粉'],
-            rice: ['咖喱饭', '韩式拌饭', '日式丼饭', '西班牙海鲜饭', ' risotto']
-        }
+    // 扩充食物数据库 - 200+ 种具体菜肴
+    const foodDatabase: Record<string, string[]> = {
+        // 川菜
+        sichuan: ['鱼香肉丝', '宫保鸡丁', '麻婆豆腐', '水煮鱼', '回锅肉', '水煮肉片', '辣子鸡', '毛血旺', '夫妻肺片', '口水鸡', '糖醋排骨', '鱼香茄子', '干煸豆角', '酸菜鱼', '麻辣香锅', '串串香', '冒菜', '钵钵鸡', '凉面', '冰粉'],
+        // 粤菜
+        cantonese: ['白切鸡', '烧鹅', '叉烧', '虾饺', '肠粉', '云吞面', '及第粥', '煲仔饭', '豉汁蒸排骨', '凤爪', '蛋挞', '菠萝包', '奶茶', '双皮奶', '姜撞奶', '杨枝甘露', '干炒牛河', '广式月饼', '老火靓汤', '烧卖'],
+        // 湘菜
+        hunan: ['剁椒鱼头', '辣椒炒肉', '口味虾', '臭豆腐', '糖油粑粑', '湘西外婆菜', '干锅牛蛙', '酸辣粉', '米粉', '红烧肉', '腊味合蒸', '永州血鸭', '东安子鸡', '油爆虾', '姊妹团子'],
+        // 鲁菜
+        shandong: ['糖醋鲤鱼', '九转大肠', '葱烧海参', '德州扒鸡', '四喜丸子', '油爆双脆', '奶汤蒲菜', '扒原壳鲍鱼', '糟熘鱼片', '一品豆腐', '锅塌豆腐', '胶东大饽饽', '周村烧饼'],
+        // 苏菜
+        jiangsu: ['盐水鸭', '松鼠鳜鱼', '狮子头', '东坡肉', '叫花鸡', '糖醋小排', '蟹粉豆腐', '阳春面', '鸭血粉丝汤', '小笼包', '汤包', '三丁包子', '千层油糕', '翡翠烧卖', '糯米烧卖'],
+        // 浙菜
+        zhejiang: ['西湖醋鱼', '龙井虾仁', '东坡肉', '宋嫂鱼羹', '叫花童鸡', '荷叶粉蒸肉', '片儿川', '葱包桧', '定胜糕', '猫耳朵', '虾爆鳝面', '宁波汤圆', '嘉兴粽子'],
+        // 闽菜
+        fujian: ['佛跳墙', '荔枝肉', '醉排骨', '七星鱼丸', '扁肉', '沙茶面', '土笋冻', '海蛎煎', '线面', '光饼', '鼎边糊', '肉燕', '扳指干贝', '鸡茸金丝笋'],
+        // 徽菜
+        anhui: ['臭鳜鱼', '毛豆腐', '问政山笋', '徽州刀板香', '一品锅', '方腊鱼', '清炖马蹄鳖', '杨梅丸子', '凤炖牡丹', '双爆串飞', '红烧划水', '腌鲜鳜鱼'],
+        // 面食
+        noodle: ['兰州牛肉面', '山西刀削面', '河南烩面', '武汉热干面', '北京炸酱面', '四川担担面', '重庆小面', '陕西油泼面', '岐山臊子面', ' biangbiang面', '延吉冷面', '扬州炒面', '昆山奥灶面', '镇江锅盖面', '杭州片儿川', '葱油拌面', '阳春面', '云吞面', '竹升面', '伊府面'],
+        // 米饭类
+        rice: ['扬州炒饭', '蛋炒饭', '腊味煲仔饭', '卤肉饭', '黄焖鸡米饭', '照烧鸡腿饭', '叉烧饭', '烧鹅饭', '盐焗鸡饭', '豉油鸡饭', '海南鸡饭', '排骨饭', '牛腩饭', '猪肘饭', '烧鸭饭', '白切鸡饭', '咖喱饭', '石锅拌饭', '紫菜包饭', '饭团'],
+        // 火锅/干锅
+        hotpot: ['四川火锅', '重庆火锅', '老北京铜锅涮肉', '潮汕牛肉火锅', '菌菇火锅', '酸菜鱼火锅', '羊蝎子火锅', '韩式部队锅', '日式寿喜烧', '泰式冬阴功火锅', '麻辣香锅', '干锅牛蛙', '干锅花菜', '干锅土豆片', '干锅排骨'],
+        // 烧烤/炸物
+        bbq: ['烤羊肉串', '烤鸡翅', '烤鱼', '烤茄子', '烤韭菜', '烤金针菇', '烤生蚝', '烤扇贝', '烤冷面', '煎饼果子', '手抓饼', '鸡蛋灌饼', '炸鸡排', '炸鸡腿', '炸薯条', '炸串', '臭豆腐', '糖油粑粑', '油条', '麻球'],
+        // 小吃/点心
+        snack: ['肉夹馍', '凉皮', '凉面', '凉粉', '酸辣粉', '螺蛳粉', '桂林米粉', '过桥米线', '砂锅米线', '花甲粉', '新疆炒米粉', '鸭血粉丝汤', '馄饨', '饺子', '包子', '馒头', '花卷', '烧卖', '小笼包', '生煎包'],
+        // 日料
+        japanese: ['寿司', '刺身', '拉面', '天妇罗', '寿喜烧', '鳗鱼饭', '牛肉饭', '咖喱饭', '乌冬面', '荞麦面', '章鱼烧', '大阪烧', '可乐饼', '炸猪排', '味噌汤', '茶泡饭', '亲子丼', '海鲜丼', '炸虾饭', '日式汉堡排'],
+        // 韩餐
+        korean: ['石锅拌饭', '韩式炸鸡', '泡菜汤', '大酱汤', '海带汤', '冷面', '炸酱面', '海鲜面', '烤肉', '烤五花肉', '炒年糕', '鱼饼', '紫菜包饭', '泡菜饼', '海鲜饼', '土豆排骨锅', '部队锅', '参鸡汤', '韩式猪蹄', '辣炒猪肉'],
+        // 西餐
+        western: ['牛排', '猪排', '鸡排', '汉堡', '披萨', '意大利面', '肉酱面', '奶油培根面', '海鲜面', '千层面', '通心粉', '焗饭', ' risotto', '沙拉', '三明治', '热狗', ' tacos', 'burrito', '烤鸡', '炸鱼薯条'],
+        // 东南亚
+        southeast: ['泰式炒河粉', '冬阴功汤', '绿咖喱', '黄咖喱', '红咖喱', '芒果糯米饭', '菠萝炒饭', '越南河粉', '越南春卷', '法棍三明治', '肉骨茶', '海南鸡饭', '叻沙', '沙爹', '炒粿条', '啰惹', '椰浆饭', '加多加多', '沙爹串', '蕉叶鱼'],
+        // 快餐/外卖
+        fastfood: ['麦当劳', '肯德基', '汉堡王', '赛百味', '必胜客', '达美乐', '真功夫', '永和大王', '吉野家', '食其家', '老乡鸡', '大米先生', '乡村基', '华莱士', '塔斯汀', '正新鸡排', '绝味鸭脖', '周黑鸭', '煌上煌', '紫燕百味鸡'],
+        // 轻食/健康
+        healthy: ['鸡胸肉沙拉', '金枪鱼沙拉', '牛油果沙拉', '凯撒沙拉', '希腊沙拉', '藜麦饭', '全麦三明治', '蔬菜卷', '果昔碗', '酸奶杯', '能量碗', '波奇饭', '荞麦面沙拉', '烤蔬菜', '蒸蛋', '杂粮粥', '紫薯', '玉米', '南瓜', '鸡胸肉'],
+        // 甜品/饮料
+        dessert: ['奶茶', '水果茶', '奶盖茶', '咖啡', '美式', '拿铁', '卡布奇诺', '摩卡', '星冰乐', '蛋糕', '提拉米苏', '芝士蛋糕', '芒果班戟', '榴莲千层', '泡芙', '蛋挞', '曲奇', '马卡龙', '布丁', '冰淇淋']
     };
 
     const cuisineNames: Record<string, string> = {
@@ -1726,30 +1779,40 @@ function ChefView({ t, setView }: any) {
     const generateResult = () => {
         let candidates: string[] = [];
         
-        // 根据偏好筛选
-        if (preferences.style === 'chinese') {
-            candidates = [...foodDatabase.chinese.noodle, ...foodDatabase.chinese.rice];
-        } else if (preferences.style === 'western') {
-            candidates = [...foodDatabase.western.noodle, ...foodDatabase.western.rice];
-        } else {
+        // 根据菜系筛选
+        if (preferences.cuisine) {
+            // 特定菜系
+            if (foodDatabase[preferences.cuisine]) {
+                candidates = [...foodDatabase[preferences.cuisine]];
+            }
+        } else if (preferences.style === 'chinese') {
+            // 中餐大类
             candidates = [
-                ...foodDatabase.chinese.noodle, ...foodDatabase.chinese.rice,
-                ...foodDatabase.western.noodle, ...foodDatabase.western.rice
+                ...foodDatabase.sichuan, ...foodDatabase.cantonese, 
+                ...foodDatabase.hunan, ...foodDatabase.shandong,
+                ...foodDatabase.jiangsu, ...foodDatabase.zhejiang,
+                ...foodDatabase.fujian, ...foodDatabase.anhui,
+                ...foodDatabase.noodle, ...foodDatabase.rice
             ];
+        } else if (preferences.style === 'western') {
+            // 西餐大类
+            candidates = [
+                ...foodDatabase.western, ...foodDatabase.japanese,
+                ...foodDatabase.korean, ...foodDatabase.southeast
+            ];
+        } else if (preferences.type === 'noodle') {
+            // 面食
+            candidates = [...foodDatabase.noodle];
+        } else if (preferences.type === 'rice') {
+            // 米饭
+            candidates = [...foodDatabase.rice];
+        } else {
+            // 全部食物
+            candidates = Object.values(foodDatabase).flat();
         }
 
-        // 如果指定了面/饭类型，简单过滤
-        if (preferences.type === 'noodle') {
-            candidates = candidates.filter(f => 
-                foodDatabase.chinese.noodle.includes(f) || 
-                foodDatabase.western.noodle.includes(f)
-            );
-        } else if (preferences.type === 'rice') {
-            candidates = candidates.filter(f => 
-                foodDatabase.chinese.rice.includes(f) || 
-                foodDatabase.western.rice.includes(f)
-            );
-        }
+        // 去重
+        candidates = [...new Set(candidates)];
 
         // 随机选择
         const randomFood = candidates[Math.floor(Math.random() * candidates.length)];
@@ -1765,6 +1828,44 @@ function ChefView({ t, setView }: any) {
         }
 
         setResult(randomFood + placeText);
+    };
+
+    // 自定义随机
+    const handleCustomRandom = () => {
+        const validOptions = customOptions.filter(opt => opt.trim() !== '');
+        if (validOptions.length < 2) {
+            alert(t.chef?.needTwoOptions || '请至少输入两个选项');
+            return;
+        }
+        
+        setIsRandomizing(true);
+        setCustomResult(null);
+        
+        let count = 0;
+        const interval = setInterval(() => {
+            count++;
+            if (count > 8) {
+                clearInterval(interval);
+                const randomResult = validOptions[Math.floor(Math.random() * validOptions.length)];
+                setCustomResult(randomResult);
+                setIsRandomizing(false);
+            }
+        }, 100);
+    };
+
+    const addCustomOption = () => {
+        setCustomOptions([...customOptions, '']);
+    };
+
+    const removeCustomOption = (index: number) => {
+        if (customOptions.length <= 2) return;
+        setCustomOptions(customOptions.filter((_, i) => i !== index));
+    };
+
+    const updateCustomOption = (index: number, value: string) => {
+        const newOptions = [...customOptions];
+        newOptions[index] = value;
+        setCustomOptions(newOptions);
     };
 
     const cuisineOptions = [
@@ -1787,7 +1888,7 @@ function ChefView({ t, setView }: any) {
 
             {/* Tab 切换 */}
             <div className="subtab-container" style={{ marginBottom: '20px' }}>
-                <div className={`subtab-slider ${activeTab === 'menu' ? 'right' : ''}`}></div>
+                <div className={`subtab-slider ${activeTab === 'custom' ? 'middle' : activeTab === 'menu' ? 'right' : ''}`}></div>
                 <button 
                     className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} 
                     onClick={() => setActiveTab('random')}
@@ -1795,10 +1896,16 @@ function ChefView({ t, setView }: any) {
                     🎲 {t.chef?.whatToEat || '今天吃什么'}
                 </button>
                 <button 
+                    className={`tab-btn ${activeTab === 'custom' ? 'active' : ''}`} 
+                    onClick={() => setActiveTab('custom')}
+                >
+                    🤔 {t.chef?.custom || '帮我选'}
+                </button>
+                <button 
                     className={`tab-btn ${activeTab === 'menu' ? 'active' : ''}`} 
                     onClick={() => setActiveTab('menu')}
                 >
-                    📋 {t.chef?.menu || '点菜菜单'}
+                    📋 {t.chef?.menu || '菜单'}
                 </button>
             </div>
 
@@ -1808,46 +1915,81 @@ function ChefView({ t, setView }: any) {
                         {/* 偏好选择区域 */}
                         {!result && (
                             <>
-                                {/* 风格选择 */}
+                                {/* 菜系选择 */}
                                 <div className="settings-card-new">
-                                    <div className="section-label">🍜 {t.chef?.style || '风格'}</div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button
-                                            onClick={() => setPreferences(p => ({ ...p, style: p.style === 'chinese' ? '' : 'chinese' }))}
-                                            style={{
-                                                padding: '14px',
-                                                borderRadius: '14px',
-                                                border: '2px solid',
-                                                borderColor: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--border-color)',
-                                                background: preferences.style === 'chinese' ? 'var(--accent-light)' : 'var(--card-bg)',
-                                                color: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--text-main)',
-                                                fontWeight: 700,
-                                                fontSize: '14px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            🥢 {t.chef?.chinese || '中餐'}
-                                        </button>
-                                        <button
-                                            onClick={() => setPreferences(p => ({ ...p, style: p.style === 'western' ? '' : 'western' }))}
-                                            style={{
-                                                padding: '14px',
-                                                borderRadius: '14px',
-                                                border: '2px solid',
-                                                borderColor: preferences.style === 'western' ? 'var(--accent)' : 'var(--border-color)',
-                                                background: preferences.style === 'western' ? 'var(--accent-light)' : 'var(--card-bg)',
-                                                color: preferences.style === 'western' ? 'var(--accent)' : 'var(--text-main)',
-                                                fontWeight: 700,
-                                                fontSize: '14px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            🍴 {t.chef?.western || '西餐'}
-                                        </button>
+                                    <div className="section-label">🍜 {t.chef?.cuisine || '菜系'}</div>
+                                    <div className="cuisine-grid">
+                                        {[
+                                            { key: 'sichuan', emoji: '🌶️', label: '川菜' },
+                                            { key: 'cantonese', emoji: '🥟', label: '粤菜' },
+                                            { key: 'hunan', emoji: '🔥', label: '湘菜' },
+                                            { key: 'jiangsu', emoji: '🍲', label: '苏菜' },
+                                            { key: 'shandong', emoji: '🥟', label: '鲁菜' },
+                                            { key: 'zhejiang', emoji: '🐟', label: '浙菜' },
+                                            { key: 'fujian', emoji: '🍜', label: '闽菜' },
+                                            { key: 'japanese', emoji: '🍣', label: '日料' },
+                                            { key: 'korean', emoji: '🍜', label: '韩餐' },
+                                            { key: 'western', emoji: '🥩', label: '西餐' },
+                                            { key: 'southeast', emoji: '🍛', label: '东南亚' },
+                                            { key: 'fastfood', emoji: '🍔', label: '快餐' }
+                                        ].map(({ key, emoji, label }) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setPreferences(p => ({ 
+                                                    ...p, 
+                                                    cuisine: p.cuisine === key ? '' : key 
+                                                }))}
+                                                className={`cuisine-btn ${preferences.cuisine === key ? 'active' : ''}`}
+                                            >
+                                                <span style={{ fontSize: '20px' }}>{emoji}</span>
+                                                <span>{label}</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
+                                
+                                {/* 或选择大类 */}
+                                {!preferences.cuisine && (
+                                    <div className="settings-card-new">
+                                        <div className="section-label">🍽️ {t.chef?.category || '大类'}</div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                            <button
+                                                onClick={() => setPreferences(p => ({ ...p, style: p.style === 'chinese' ? '' : 'chinese', cuisine: '' }))}
+                                                style={{
+                                                    padding: '14px',
+                                                    borderRadius: '14px',
+                                                    border: '2px solid',
+                                                    borderColor: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--border-color)',
+                                                    background: preferences.style === 'chinese' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                    color: preferences.style === 'chinese' ? 'var(--accent)' : 'var(--text-main)',
+                                                    fontWeight: 700,
+                                                    fontSize: '14px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                🥢 {t.chef?.chinese || '中餐'}
+                                            </button>
+                                            <button
+                                                onClick={() => setPreferences(p => ({ ...p, style: p.style === 'western' ? '' : 'western', cuisine: '' }))}
+                                                style={{
+                                                    padding: '14px',
+                                                    borderRadius: '14px',
+                                                    border: '2px solid',
+                                                    borderColor: preferences.style === 'western' ? 'var(--accent)' : 'var(--border-color)',
+                                                    background: preferences.style === 'western' ? 'var(--accent-light)' : 'var(--card-bg)',
+                                                    color: preferences.style === 'western' ? 'var(--accent)' : 'var(--text-main)',
+                                                    fontWeight: 700,
+                                                    fontSize: '14px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                🍴 {t.chef?.western || '西餐'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* 面/饭选择 */}
                                 <div className="settings-card-new">
@@ -1995,8 +2137,92 @@ function ChefView({ t, setView }: any) {
                             </div>
                         )}
                     </div>
-                ) : (
-                    /* 点菜菜单 - 预留端口 */
+                )}
+
+                {activeTab === 'custom' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div className="settings-card-new">
+                            <div className="section-label">🤔 {t.chef?.customTitle || '输入你的选项'}</div>
+                            <p style={{ color: 'var(--text-soft)', fontSize: '13px', marginBottom: '16px' }}>
+                                {t.chef?.customDesc || '不知道选哪个？让我来帮你决定！'}
+                            </p>
+                            
+                            {customOptions.map((option, index) => (
+                                <div key={index} className="custom-option-input">
+                                    <input
+                                        type="text"
+                                        placeholder={`${t.chef?.option || '选项'} ${index + 1}`}
+                                        value={option}
+                                        onChange={(e) => updateCustomOption(index, e.target.value)}
+                                    />
+                                    {customOptions.length > 2 && (
+                                        <button 
+                                            className="remove-btn"
+                                            onClick={() => removeCustomOption(index)}
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            
+                            <button 
+                                className="add-option-btn"
+                                onClick={addCustomOption}
+                            >
+                                <span>+</span> {t.chef?.addOption || '添加选项'}
+                            </button>
+                        </div>
+
+                        {!customResult ? (
+                            <button
+                                onClick={handleCustomRandom}
+                                disabled={isRandomizing}
+                                className="btn-confirm highlight glow"
+                                style={{
+                                    height: '56px',
+                                    fontSize: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px'
+                                }}
+                            >
+                                {isRandomizing ? (
+                                    <><span className="spin">🎲</span> {t.chef?.deciding || '决定中...'}</>
+                                ) : (
+                                    <><span>🎯</span> {t.chef?.helpMeChoose || '帮我选'}</>
+                                )}
+                            </button>
+                        ) : (
+                            <div className="custom-result">
+                                <div style={{ fontSize: '48px', marginBottom: '8px' }}>🎉</div>
+                                <div style={{ fontSize: '13px', color: 'var(--text-soft)', fontWeight: 600 }}>
+                                    {t.chef?.result || '结果是'}
+                                </div>
+                                <div className="custom-result-text">
+                                    {customResult}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setCustomResult(null);
+                                        setCustomOptions(['', '']);
+                                    }}
+                                    className="btn-confirm"
+                                    style={{
+                                        background: 'var(--card-bg)',
+                                        color: 'var(--text-main)',
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.06)'
+                                    }}
+                                >
+                                    🔄 {t.chef?.tryAgain || '再试一次'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'menu' && (
                     <div 
                         className="settings-card-new"
                         style={{
