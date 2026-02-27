@@ -1484,6 +1484,13 @@ function App() {
         );
     };
 
+    // 确保登录后 appReady 为 true（处理从登录页跳转的情况）
+    useEffect(() => {
+        if (user && !appReady) {
+            setAppReady(true);
+        }
+    }, [user, appReady]);
+    
     // 显示登录界面
     if (!user && !authLoading) {
         return <AuthView t={t} onLogin={(u) => setUser(u)} />;
