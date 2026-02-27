@@ -760,8 +760,11 @@ function AuthView({ t, onLogin }: { t: any, onLogin: (user: User) => void }) {
             minHeight: '100vh', 
             display: 'flex', 
             flexDirection: 'column',
-            justifyContent: 'center',
-            padding: '20px'
+            justifyContent: 'flex-start',
+            padding: '20px',
+            overflowY: 'auto',
+            paddingTop: '60px',
+            paddingBottom: '40px'
         }}>
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                 <div style={{ fontSize: '80px', marginBottom: '16px' }}>🥑</div>
@@ -874,13 +877,14 @@ function AuthView({ t, onLogin }: { t: any, onLogin: (user: User) => void }) {
                             padding: '16px',
                             borderRadius: '16px',
                             border: 'none',
-                            background: 'var(--accent-gradient)',
+                            background: '#FF9671',
                             color: 'white',
                             fontSize: '16px',
                             fontWeight: '800',
                             cursor: loading ? 'not-allowed' : 'pointer',
                             opacity: loading ? 0.7 : 1,
-                            transition: 'transform 0.2s, opacity 0.2s'
+                            transition: 'transform 0.2s, opacity 0.2s',
+                            boxShadow: '0 4px 12px rgba(255, 150, 113, 0.3)'
                         }}
                     >
                         {loading ? '...' : (isLogin ? t.auth.loginBtn : t.auth.registerBtn)}
@@ -915,6 +919,28 @@ function AuthView({ t, onLogin }: { t: any, onLogin: (user: User) => void }) {
 }
 
 function App() {
+    // 先定义 settings，因为其他 hooks 依赖它
+    const [settings, setSettings] = useState<AppSettings>({
+        language: 'zh',
+        darkModeType: 'system',
+        manualDarkMode: false,
+        pushNotifications: true,
+        inAppPopups: true,
+        vibration: true,
+        reminders: {
+            calendarReminders: [
+                { id: '1', name: '早起打卡', time: '07:00', enabled: true },
+                { id: '2', name: '喝水提醒', time: '10:00', enabled: false },
+                { id: '3', name: '午休提醒', time: '12:30', enabled: false },
+            ],
+            auxiliaryEnabled: true,
+            reportNotify: true,
+            shareNotify: true,
+            messageCenterNotify: false,
+            animIntensity: 'medium'
+        }
+    });
+    
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
     const [view, setView] = useState<'home' | 'checkin' | 'stats' | 'settings' | 'anniversary' | 'chef' | 'bill'>('home');
@@ -1143,27 +1169,6 @@ function App() {
             setView('home');
         }
     };
-    
-    const [settings, setSettings] = useState<AppSettings>({
-        language: 'zh',
-        darkModeType: 'system',
-        manualDarkMode: false,
-        pushNotifications: true,
-        inAppPopups: true,
-        vibration: true,
-        reminders: {
-            calendarReminders: [
-                { id: '1', name: '早起打卡', time: '07:00', enabled: true },
-                { id: '2', name: '喝水提醒', time: '10:00', enabled: false },
-                { id: '3', name: '午休提醒', time: '12:30', enabled: false },
-            ],
-            auxiliaryEnabled: true,
-            reportNotify: true,
-            shareNotify: true,
-            messageCenterNotify: false,
-            animIntensity: 'medium'
-        }
-    });
     
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [editName, setEditName] = useState('');
