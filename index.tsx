@@ -2083,7 +2083,21 @@ function CheckinSelection({ t, checkinSubTab, setCheckinSubTab, setSelectedItem,
     return (
         <div className="view">
             <div className="sub-header"><button onClick={() => setView('home')} className="back-btn"><BackArrow /></button><h2>{t.checkin}</h2></div>
-            <div className="subtab-container"><div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div><button className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} onClick={() => setCheckinSubTab('sport')}>{t.sportCheck}</button><button className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} onClick={() => setCheckinSubTab('event')}>{t.eventCheck}</button></div>
+            <div className=".subtab-container.two-tab">
+                <div className={`subtab-slider ${checkinSubTab === 'event' ? 'right' : ''}`}></div>
+                <button 
+                    className={`tab-btn ${checkinSubTab === 'sport' ? 'active' : ''}`} 
+                    onClick={() => setCheckinSubTab('sport')}
+                >
+                    {t.sportCheck}
+                </button>
+                <button 
+                    className={`tab-btn ${checkinSubTab === 'event' ? 'active' : ''}`} 
+                    onClick={() => setCheckinSubTab('event')}
+                >
+                    {t.eventCheck}
+                </button>
+            </div>
             <div className="scroll-area-categories" style={{paddingBottom:'20px'}}>
                 {cats.map(c => ( 
                     <div key={c.title} style={{marginBottom:'24px'}}>
