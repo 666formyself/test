@@ -596,7 +596,7 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 
 .subtab-slider {
     position: absolute;
-    width: calc(33.333% - 3px);
+    width: calc(50% - 4px);
     height: calc(100% - 8px);
     background: var(--card-bg);
     border-radius: 16px;
@@ -606,15 +606,27 @@ input:checked + .slider-round:before { transform: translateX(20px); }
     transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+/* 三 Tab 样式 */
+.subtab-container.three-tab .subtab-slider {
+    width: calc(33.333% - 3px);
+}
+
 .subtab-slider.middle {
-    transform: translateX(calc(100% + 3px));
+    transform: translateX(calc(100% + 8px));
 }
 
 .subtab-slider.right {
-    transform: translateX(calc(200% + 6px));
+    transform: translateX(calc(100% + 8px));
 }
 
-.subtab-slider.right { transform: translateX(100%); }
+/* 三 Tab 样式 */
+.subtab-container.three-tab .subtab-slider.middle {
+    transform: translateX(calc(100% + 3px));
+}
+
+.subtab-container.three-tab .subtab-slider.right {
+    transform: translateX(calc(200% + 6px));
+}
 
 .tab-btn {
     flex: 1;
