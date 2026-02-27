@@ -714,6 +714,13 @@ function AuthView({ t, onLogin }: { t: any, onLogin: (user: User) => void }) {
         e.preventDefault();
         if (!validate()) return;
         
+        // 检查 Supabase 是否配置
+        const hasSupabaseConfig = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+        if (!hasSupabaseConfig) {
+            setError('请先配置 Supabase 环境变量（VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY）');
+            return;
+        }
+        
         setLoading(true);
         setError('');
         
@@ -928,13 +935,30 @@ function App() {
     // 检查登录状态
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                setUser({ id: session.user.id, email: session.user.email! });
-                // 从云端加载数据
-                await loadUserData(session.user.id);
-            } else {
-                // 未登录，尝试从本地加载
+            try {
+                // 检查 Supabase 是否配置
+                const hasSupabaseConfig = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+                
+                if (!hasSupabaseConfig) {
+                    console.log('⚠️ 未配置 Supabase，使用本地模式');
+                    loadLocalData();
+                    setAuthLoading(false);
+                    setIsAppLoading(false);
+                    return;
+                }
+                
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    setUser({ id: session.user.id, email: session.user.email! });
+                    // 从云端加载数据
+                    await loadUserData(session.user.id);
+                } else {
+                    // 未登录，尝试从本地加载
+                    loadLocalData();
+                }
+            } catch (err) {
+                console.error('认证检查失败:', err);
+                // 出错时回退到本地模式
                 loadLocalData();
             }
             setAuthLoading(false);
@@ -942,16 +966,17 @@ function App() {
         };
         checkAuth();
         
-        // 监听登录状态变化
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                setUser({ id: session.user.id, email: session.user.email! });
-            } else {
-                setUser(null);
-            }
-        });
-        
-        return () => subscription.unsubscribe();
+        // 监听登录状态变化（仅在配置正确时）
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                if (session?.user) {
+                    setUser({ id: session.user.id, email: session.user.email! });
+                } else {
+                    setUser(null);
+                }
+            });
+            return () => subscription.unsubscribe();
+        }
     }, []);
     
     // 从云端加载数据
@@ -1038,7 +1063,10 @@ function App() {
     
     // 同步数据到云端
     const syncToCloud = async () => {
-        if (!user) return;
+        // 检查 Supabase 是否配置
+        const hasSupabaseConfig = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+        if (!hasSupabaseConfig || !user) return;
+        
         try {
             // 同步打卡记录
             if (records.length > 0) {

@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 // 在 .env.local 文件中设置：
 // VITE_SUPABASE_URL=https://your-project.supabase.co
 // VITE_SUPABASE_ANON_KEY=your-anon-key
+// 调试：打印环境变量（开发时看，生产时删除）
+console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '已设置 ✅' : '未设置 ❌');
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
