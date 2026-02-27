@@ -613,7 +613,7 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 
 /* 默认 2 Tab 位置 */
 .subtab-slider.right {
-    transform: translateX(calc(100% + 8px));
+    transform: translateX(calc(50% + 8px));
 }
 
 /* 三 Tab 样式 */
