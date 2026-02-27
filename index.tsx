@@ -2530,7 +2530,7 @@ function ChefView({ t, setView }: any) {
             </div>
 
             {/* Tab 切换 */}
-            <div className="subtab-container" style={{ marginBottom: '20px' }}>
+            <div className="subtab-container three-tab" style={{ marginBottom: '20px' }}>
                 <div className={`subtab-slider ${activeTab === 'custom' ? 'middle' : activeTab === 'menu' ? 'right' : ''}`}></div>
                 <button 
                     className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} 
@@ -3262,7 +3262,7 @@ function BillView({ t, setView }: any) {
             </div>
 
             {/* Tab 切换 */}
-            <div className="subtab-container" style={{ marginBottom: '20px' }}>
+            <div className="subtab-container three-tab" style={{ marginBottom: '20px' }}>
                 <div className={`subtab-slider ${activeTab === 'stats' ? 'middle' : activeTab === 'list' ? 'right' : ''}`}></div>
                 <button className={`tab-btn ${activeTab === 'import' ? 'active' : ''}`} onClick={() => setActiveTab('import')}>
                     📥 {t.bill?.importTitle || '导入'}
