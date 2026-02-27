@@ -4,6 +4,8 @@
 
 一个基于 React + TypeScript + Vite 构建的渐进式 Web 应用 (PWA)，专为情侣设计的贴心生活助手。
 
+**纯前端应用**：所有数据存储在本地 LocalStorage，无需后端服务器，无需 API Key。
+
 ## ✨ 功能特性
 
 ### 1. 打卡系统
@@ -64,7 +66,6 @@
 | TypeScript | ~5.8.2 | 类型安全 |
 | Vite | ^6.2.0 | 构建工具 |
 | xlsx | ^0.18.5 | Excel/CSV 解析 |
-| @google/genai | ^0.7.0 | AI 功能（预留） |
 
 ## 📁 文件结构
 
@@ -76,11 +77,9 @@
 ├── sw.js               # Service Worker（缓存、推送通知）
 ├── manifest.json       # PWA 配置（图标、主题色、启动方式）
 ├── metadata.json       # 应用元数据（权限声明）
-├── vite.config.ts      # Vite 配置（环境变量注入）
+├── vite.config.ts      # Vite 配置
 ├── tsconfig.json       # TypeScript 配置
 ├── package.json        # 项目依赖和脚本
-├── .env.example        # 环境变量模板
-├── .env.local          # 本地环境变量（⚠️ 不要提交到仓库）
 └── .gitignore          # Git 忽略规则
 ```
 
@@ -93,12 +92,10 @@
 | `index.css` | ✅ | 样式文件，支持浅色/深色主题 |
 | `sw.js` | ✅ | Service Worker，实现离线访问和推送 |
 | `manifest.json` | ✅ | PWA 清单文件 |
-| `metadata.json` | ✅ | 扩展元数据（相机权限等） |
-| `vite.config.ts` | ✅ | 构建配置，注入 API Key |
+| `metadata.json` | ✅ | 扩展元数据 |
+| `vite.config.ts` | ✅ | 构建配置 |
 | `tsconfig.json` | ✅ | TypeScript 编译配置 |
 | `package.json` | ✅ | npm 依赖管理 |
-| `.env.example` | ✅ | 环境变量示例模板 |
-| `.env.local` | ⚠️ | 本地环境变量（含敏感信息） |
 | `.gitignore` | ✅ | 忽略 node_modules 等 |
 
 ## 🚀 快速开始
@@ -110,12 +107,6 @@
 ### 安装依赖
 ```bash
 npm install
-```
-
-### 配置环境变量
-```bash
-cp .env.example .env.local
-# 编辑 .env.local，填入你的 API Key（如需 AI 功能）
 ```
 
 ### 开发模式
@@ -135,14 +126,14 @@ npm run preview
 
 ## 📱 部署说明
 
-### Vercel 部署注意事项
-1. 在 Project → Settings → Environment Variables 中设置 `DOUBAO_API_KEY`
-2. 确保变量应用于 Production/Preview 环境
-3. 修改环境变量后需要重新部署
+本项目是纯前端应用，可直接部署到任何静态托管服务：
 
-### 环境变量安全
-- **切勿**将 `.env.local` 提交到代码仓库
-- 生产环境应使用服务器端代理转发 AI 请求，避免暴露 API Key
+- **Vercel**: `vercel --prod`
+- **Netlify**: 拖拽 `dist` 文件夹即可
+- **GitHub Pages**: 使用 `gh-pages` 分支
+- **Cloudflare Pages**: 直接连接 Git 仓库
+
+构建命令：`npm run build`，输出目录：`dist`
 
 ## 🎯 核心数据结构
 
