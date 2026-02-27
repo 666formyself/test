@@ -605,7 +605,10 @@ input:checked + .slider-round:before { transform: translateX(20px); }
     left: 4px;
     transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
 }
-
+/* 默认 2 Tab 位置 */
+.subtab-container.subtab-slider.right {
+    transform: translateX(calc(100% + 4px));
+}
 /* 三 Tab 样式 */
 .subtab-container.three-tab .subtab-slider {
     width: calc(33.333% - 3px);
