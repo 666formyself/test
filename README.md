@@ -4,7 +4,7 @@
 
 一个基于 React + TypeScript + Vite 构建的渐进式 Web 应用 (PWA)，专为情侣设计的贴心生活助手。
 
-**纯前端应用**：所有数据存储在本地 LocalStorage，无需后端服务器，无需 API Key。
+**云端同步**：基于 Supabase 实现用户认证和数据云同步，支持多设备同步。
 
 ## ✨ 功能特性
 
@@ -65,22 +65,27 @@
 | React | ^19.0.0 | UI 框架 |
 | TypeScript | ~5.8.2 | 类型安全 |
 | Vite | ^6.2.0 | 构建工具 |
+| Supabase | ^2.49.1 | 后端服务（Auth + Database）|
 | xlsx | ^0.18.5 | Excel/CSV 解析 |
 
 ## 📁 文件结构
 
 ```
 .
-├── index.html          # PWA 入口，包含 manifest 和 service worker 注册
-├── index.tsx           # 主应用组件（~3000 行，包含所有功能模块）
-├── index.css           # 全局样式（CSS 变量主题、动画、响应式）
-├── sw.js               # Service Worker（缓存、推送通知）
-├── manifest.json       # PWA 配置（图标、主题色、启动方式）
-├── metadata.json       # 应用元数据（权限声明）
+├── index.html          # PWA 入口
+├── index.tsx           # 主应用组件
+├── index.css           # 全局样式
+├── sw.js               # Service Worker
+├── manifest.json       # PWA 配置
+├── metadata.json       # 应用元数据
 ├── vite.config.ts      # Vite 配置
 ├── tsconfig.json       # TypeScript 配置
-├── package.json        # 项目依赖和脚本
-└── .gitignore          # Git 忽略规则
+├── package.json        # 项目依赖
+├── .env.example        # 环境变量示例
+├── .env.local          # 本地环境变量（已忽略）
+├── .gitignore          # Git 忽略规则
+└── lib/
+    └── supabase.ts     # Supabase 客户端配置
 ```
 
 ### 文件用途说明
@@ -104,12 +109,90 @@
 - Node.js 18+
 - npm 或 yarn
 
-### 安装依赖
+### 1. 创建 Supabase 项目
+
+1. 访问 [supabase.com](https://supabase.com) 注册/登录
+2. 点击 "New Project" 创建新项目
+3. 记下 **Project URL** 和 **anon public API key**
+
+### 2. 创建数据库表
+
+在 Supabase SQL Editor 中执行以下 SQL：
+
+```sql
+-- 打卡记录表
+CREATE TABLE checkin_records (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    timestamp BIGINT NOT NULL,
+    type TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    note TEXT,
+    duration INTEGER,
+    distance REAL,
+    unit TEXT,
+    count INTEGER,
+    sets INTEGER,
+    time TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 纪念日表
+CREATE TABLE anniversaries (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    category TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 用户设置表
+CREATE TABLE user_settings (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    language TEXT DEFAULT 'zh',
+    dark_mode_type TEXT DEFAULT 'system',
+    manual_dark_mode BOOLEAN DEFAULT false,
+    push_notifications BOOLEAN DEFAULT true,
+    in_app_popups BOOLEAN DEFAULT true,
+    vibration BOOLEAN DEFAULT true,
+    reminders JSONB DEFAULT '{}',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 启用 RLS（行级安全）
+ALTER TABLE checkin_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE anniversaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+
+-- 创建策略：用户只能访问自己的数据
+CREATE POLICY "Users can only access their own checkin records" ON checkin_records
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only access their own anniversaries" ON anniversaries
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only access their own settings" ON user_settings
+    FOR ALL USING (auth.uid() = user_id);
+```
+
+### 3. 配置环境变量
+
+创建 `.env.local` 文件：
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+### 4. 安装依赖
 ```bash
 npm install
 ```
 
-### 开发模式
+### 5. 开发模式
 ```bash
 npm run dev
 ```
@@ -126,14 +209,35 @@ npm run preview
 
 ## 📱 部署说明
 
-本项目是纯前端应用，可直接部署到任何静态托管服务：
+### Vercel 部署（推荐）
 
-- **Vercel**: `vercel --prod`
-- **Netlify**: 拖拽 `dist` 文件夹即可
-- **GitHub Pages**: 使用 `gh-pages` 分支
-- **Cloudflare Pages**: 直接连接 Git 仓库
+1. **环境变量配置**
+   在 Vercel Project → Settings → Environment Variables 中添加：
+   ```
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key-here
+   ```
 
-构建命令：`npm run build`，输出目录：`dist`
+2. **部署命令**
+   ```bash
+   vercel --prod
+   ```
+
+3. **重新部署**
+   修改环境变量后需要重新部署才能生效
+
+### 其他平台
+
+- **Netlify**: 在 Site settings → Build & deploy → Environment variables 中添加变量
+- **Cloudflare Pages**: 在 Project → Settings → Environment variables 中配置
+- **GitHub Pages**: 需要在 GitHub Secrets 中配置（不推荐，建议用 Vercel）
+
+### 构建配置
+
+- 构建命令：`npm run build`
+- 输出目录：`dist`
+
+⚠️ **重要**：`VITE_SUPABASE_ANON_KEY` 是公开可访问的（anon key），不要放入服务密钥（service_role key）！
 
 ## 🎯 核心数据结构
 

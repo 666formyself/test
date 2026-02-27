@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import * as XLSX from 'xlsx';
+import { supabase } from './lib/supabase';
 
 // --- Types ---
 type ActivityType = 'cardio' | 'strength' | 'flexibility' | 'habit' | 'mind' | 'daily' | 'wakeup' | 'general' | 'rope';
@@ -211,6 +212,31 @@ const TRANSLATIONS = {
             helpMeChoose: '帮我选',
             deciding: '决定中...',
             needTwoOptions: '请至少输入两个选项'
+        },
+        auth: {
+            login: '登录',
+            register: '注册',
+            email: '邮箱',
+            password: '密码',
+            confirmPassword: '确认密码',
+            loginBtn: '登录',
+            registerBtn: '创建账号',
+            logout: '退出登录',
+            logoutConfirm: '确定要退出登录吗？',
+            noAccount: '还没有账号？',
+            hasAccount: '已有账号？',
+            registerNow: '立即注册',
+            loginNow: '立即登录',
+            loginSuccess: '登录成功！',
+            registerSuccess: '注册成功！',
+            passwordMismatch: '两次输入的密码不一致',
+            emailRequired: '请输入邮箱',
+            passwordRequired: '请输入密码',
+            passwordMinLength: '密码至少需要6位',
+            loginError: '登录失败，请检查邮箱和密码',
+            registerError: '注册失败',
+            syncSuccess: '数据同步成功',
+            syncError: '数据同步失败'
         }
     },
     en: {
@@ -355,6 +381,31 @@ const TRANSLATIONS = {
             helpMeChoose: 'Help Me Choose',
             deciding: 'Deciding...',
             needTwoOptions: 'Please enter at least two options'
+        },
+        auth: {
+            login: 'Login',
+            register: 'Register',
+            email: 'Email',
+            password: 'Password',
+            confirmPassword: 'Confirm Password',
+            loginBtn: 'Sign In',
+            registerBtn: 'Create Account',
+            logout: 'Logout',
+            logoutConfirm: 'Are you sure you want to logout?',
+            noAccount: 'Don\'t have an account?',
+            hasAccount: 'Already have an account?',
+            registerNow: 'Register now',
+            loginNow: 'Login now',
+            loginSuccess: 'Login successful!',
+            registerSuccess: 'Registration successful!',
+            passwordMismatch: 'Passwords do not match',
+            emailRequired: 'Please enter email',
+            passwordRequired: 'Please enter password',
+            passwordMinLength: 'Password must be at least 6 characters',
+            loginError: 'Login failed, please check your credentials',
+            registerError: 'Registration failed',
+            syncSuccess: 'Data synced successfully',
+            syncError: 'Data sync failed'
         }
     }
 };
@@ -624,6 +675,238 @@ const Stepper = ({ value, onChange, label, unit, step = 1 }: { value: number, on
     </div>
 );
 
+// --- 用户认证类型 ---
+interface User {
+    id: string;
+    email: string;
+}
+
+// 登录/注册组件
+function AuthView({ t, onLogin }: { t: any, onLogin: (user: User) => void }) {
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const validate = () => {
+        if (!email.trim()) {
+            setError(t.auth.emailRequired);
+            return false;
+        }
+        if (!password.trim()) {
+            setError(t.auth.passwordRequired);
+            return false;
+        }
+        if (password.length < 6) {
+            setError(t.auth.passwordMinLength);
+            return false;
+        }
+        if (!isLogin && password !== confirmPassword) {
+            setError(t.auth.passwordMismatch);
+            return false;
+        }
+        return true;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validate()) return;
+        
+        setLoading(true);
+        setError('');
+        
+        try {
+            if (isLogin) {
+                // 登录
+                const { data, error: authError } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                if (authError) throw authError;
+                if (data.user) {
+                    onLogin({ id: data.user.id, email: data.user.email! });
+                    safeVibrate([50]);
+                }
+            } else {
+                // 注册
+                const { data, error: authError } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+                if (authError) throw authError;
+                if (data.user) {
+                    onLogin({ id: data.user.id, email: data.user.email! });
+                    safeVibrate([50, 30, 50]);
+                }
+            }
+        } catch (err: any) {
+            setError(isLogin ? t.auth.loginError : t.auth.registerError);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="view" style={{ 
+            minHeight: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '20px'
+        }}>
+            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <div style={{ fontSize: '80px', marginBottom: '16px' }}>🥑</div>
+                <h1 style={{ fontSize: '28px', fontWeight: '800', margin: '0 0 8px' }}>佳倩管家</h1>
+                <p style={{ color: 'var(--text-soft)', fontWeight: '600' }}>{t.warmMoments}</p>
+            </div>
+            
+            <form onSubmit={handleSubmit} style={{ maxWidth: '360px', width: '100%', margin: '0 auto' }}>
+                <div style={{ 
+                    background: 'var(--card-bg)', 
+                    borderRadius: '24px', 
+                    padding: '28px',
+                    border: '1px solid var(--border-color)',
+                    transition: 'background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 24px', textAlign: 'center' }}>
+                        {isLogin ? t.auth.login : t.auth.register}
+                    </h2>
+                    
+                    {error && (
+                        <div style={{ 
+                            background: '#FFE5E5', 
+                            color: '#FF3B30', 
+                            padding: '12px 16px', 
+                            borderRadius: '12px', 
+                            marginBottom: '16px',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                        }}>
+                            {error}
+                        </div>
+                    )}
+                    
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-main)' }}>
+                            {t.auth.email}
+                        </label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="your@email.com"
+                            style={{
+                                width: '100%',
+                                padding: '14px 16px',
+                                borderRadius: '14px',
+                                border: '2px solid var(--border-color)',
+                                background: 'var(--input-bg)',
+                                fontSize: '15px',
+                                fontFamily: 'inherit',
+                                color: 'var(--text-main)',
+                                transition: 'border-color 0.2s, box-shadow 0.2s, background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                        />
+                    </div>
+                    
+                    <div style={{ marginBottom: isLogin ? '24px' : '16px' }}>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-main)' }}>
+                            {t.auth.password}
+                        </label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••"
+                            style={{
+                                width: '100%',
+                                padding: '14px 16px',
+                                borderRadius: '14px',
+                                border: '2px solid var(--border-color)',
+                                background: 'var(--input-bg)',
+                                fontSize: '15px',
+                                fontFamily: 'inherit',
+                                color: 'var(--text-main)',
+                                transition: 'border-color 0.2s, box-shadow 0.2s, background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                        />
+                    </div>
+                    
+                    {!isLogin && (
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-main)' }}>
+                                {t.auth.confirmPassword}
+                            </label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="••••••"
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px',
+                                    borderRadius: '14px',
+                                    border: '2px solid var(--border-color)',
+                                    background: 'var(--input-bg)',
+                                    fontSize: '15px',
+                                    fontFamily: 'inherit',
+                                    color: 'var(--text-main)',
+                                    transition: 'border-color 0.2s, box-shadow 0.2s, background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }}
+                            />
+                        </div>
+                    )}
+                    
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        style={{
+                            width: '100%',
+                            padding: '16px',
+                            borderRadius: '16px',
+                            border: 'none',
+                            background: 'var(--accent-gradient)',
+                            color: 'white',
+                            fontSize: '16px',
+                            fontWeight: '800',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            opacity: loading ? 0.7 : 1,
+                            transition: 'transform 0.2s, opacity 0.2s'
+                        }}
+                    >
+                        {loading ? '...' : (isLogin ? t.auth.loginBtn : t.auth.registerBtn)}
+                    </button>
+                </div>
+                
+                <p style={{ textAlign: 'center', marginTop: '20px', color: 'var(--text-soft)', fontWeight: '600' }}>
+                    {isLogin ? t.auth.noAccount : t.auth.hasAccount}{' '}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsLogin(!isLogin);
+                            setError('');
+                            setPassword('');
+                            setConfirmPassword('');
+                        }}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--accent)',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            padding: 0
+                        }}
+                    >
+                        {isLogin ? t.auth.registerNow : t.auth.loginNow}
+                    </button>
+                </p>
+            </form>
+        </div>
+    );
+}
+
 function App() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [appReady, setAppReady] = useState(false);
@@ -637,6 +920,201 @@ function App() {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [activeFestival, setActiveFestival] = useState<'valentine' | 'newyear' | null>(null);
     const [showShareCard, setShowShareCard] = useState(false);
+    
+    // 用户认证状态
+    const [user, setUser] = useState<User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+    
+    // 检查登录状态
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                setUser({ id: session.user.id, email: session.user.email! });
+                // 从云端加载数据
+                await loadUserData(session.user.id);
+            } else {
+                // 未登录，尝试从本地加载
+                loadLocalData();
+            }
+            setAuthLoading(false);
+            setIsAppLoading(false);
+        };
+        checkAuth();
+        
+        // 监听登录状态变化
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser({ id: session.user.id, email: session.user.email! });
+            } else {
+                setUser(null);
+            }
+        });
+        
+        return () => subscription.unsubscribe();
+    }, []);
+    
+    // 从云端加载数据
+    const loadUserData = async (userId: string) => {
+        try {
+            // 加载打卡记录
+            const { data: recordsData } = await supabase
+                .from('checkin_records')
+                .select('*')
+                .eq('user_id', userId)
+                .order('timestamp', { ascending: false });
+            if (recordsData) {
+                setRecords(recordsData.map(r => ({
+                    id: r.id,
+                    timestamp: r.timestamp,
+                    type: r.type,
+                    activityType: r.activity_type,
+                    name: r.name,
+                    category: r.category,
+                    note: r.note,
+                    duration: r.duration,
+                    distance: r.distance,
+                    unit: r.unit,
+                    count: r.count,
+                    sets: r.sets,
+                    time: r.time
+                })));
+            }
+            
+            // 加载纪念日
+            const { data: annivData } = await supabase
+                .from('anniversaries')
+                .select('*')
+                .eq('user_id', userId);
+            if (annivData) {
+                setAnniversaries(annivData.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    date: a.date,
+                    category: a.category
+                })));
+            }
+            
+            // 加载设置
+            const { data: settingsData } = await supabase
+                .from('user_settings')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+            if (settingsData) {
+                setSettings({
+                    language: settingsData.language,
+                    darkModeType: settingsData.dark_mode_type,
+                    manualDarkMode: settingsData.manual_dark_mode,
+                    pushNotifications: settingsData.push_notifications,
+                    inAppPopups: settingsData.in_app_popups,
+                    vibration: settingsData.vibration,
+                    reminders: settingsData.reminders
+                });
+            }
+        } catch (err) {
+            console.error('加载用户数据失败:', err);
+            // 失败时加载本地数据作为后备
+            loadLocalData();
+        }
+    };
+    
+    // 从本地加载数据（后备方案）
+    const loadLocalData = () => {
+        const savedRecords = localStorage.getItem('jq_records');
+        const savedSettings = localStorage.getItem('jq_settings');
+        const savedAnniv = localStorage.getItem('jq_anniv');
+        if (savedRecords) setRecords(JSON.parse(savedRecords));
+        if (savedAnniv) setAnniversaries(JSON.parse(savedAnniv));
+        if (savedSettings) {
+            const parsed = JSON.parse(savedSettings);
+            setSettings(prev => ({ 
+                ...prev, 
+                ...parsed, 
+                reminders: { ...prev.reminders, ...parsed.reminders } 
+            }));
+        }
+    };
+    
+    // 同步数据到云端
+    const syncToCloud = async () => {
+        if (!user) return;
+        try {
+            // 同步打卡记录
+            if (records.length > 0) {
+                const recordsToSync = records.map(r => ({
+                    id: r.id,
+                    user_id: user.id,
+                    timestamp: r.timestamp,
+                    type: r.type,
+                    activity_type: r.activityType,
+                    name: r.name,
+                    category: r.category,
+                    note: r.note,
+                    duration: r.duration,
+                    distance: r.distance,
+                    unit: r.unit,
+                    count: r.count,
+                    sets: r.sets,
+                    time: r.time
+                }));
+                await supabase.from('checkin_records').upsert(recordsToSync);
+            }
+            
+            // 同步纪念日
+            if (anniversaries.length > 0) {
+                const annivToSync = anniversaries.map(a => ({
+                    id: a.id,
+                    user_id: user.id,
+                    name: a.name,
+                    date: a.date,
+                    category: a.category
+                }));
+                await supabase.from('anniversaries').upsert(annivToSync);
+            }
+            
+            // 同步设置
+            await supabase.from('user_settings').upsert({
+                user_id: user.id,
+                language: settings.language,
+                dark_mode_type: settings.darkModeType,
+                manual_dark_mode: settings.manualDarkMode,
+                push_notifications: settings.pushNotifications,
+                in_app_popups: settings.inAppPopups,
+                vibration: settings.vibration,
+                reminders: settings.reminders
+            });
+            
+            safeVibrate([30, 50, 30]);
+        } catch (err) {
+            console.error('同步失败:', err);
+        }
+    };
+    
+    // 数据变化时自动同步
+    useEffect(() => {
+        if (user && !firstUpdate.current) {
+            syncToCloud();
+        }
+        // 同时保存到本地作为后备
+        if (!firstUpdate.current) {
+            localStorage.setItem('jq_records', JSON.stringify(records));
+            localStorage.setItem('jq_settings', JSON.stringify(settings));
+            localStorage.setItem('jq_anniv', JSON.stringify(anniversaries));
+        }
+    }, [records, settings, anniversaries, user]);
+    
+    // 退出登录
+    const handleLogout = async () => {
+        if (confirm(t.auth.logoutConfirm)) {
+            await supabase.auth.signOut();
+            setUser(null);
+            // 清空当前数据
+            setRecords([]);
+            setAnniversaries([]);
+            setView('home');
+        }
+    };
     
     const [settings, setSettings] = useState<AppSettings>({
         language: 'zh',
@@ -973,6 +1451,16 @@ function App() {
         );
     };
 
+    // 显示登录界面
+    if (!user && !authLoading) {
+        return <AuthView t={t} onLogin={(u) => setUser(u)} />;
+    }
+    
+    // 显示加载中
+    if (authLoading || isAppLoading) {
+        return <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />;
+    }
+
     return (
         <>
             {/* 每日情话弹窗 - 在启动页之前显示 */}
@@ -983,8 +1471,6 @@ function App() {
                     language={settings.language}
                 />
             )}
-            
-            {isAppLoading && !showDailyQuote && <SplashScreen t={t} onFadeStart={() => setAppReady(true)} onFinish={() => setIsAppLoading(false)} />}
             {activeFestival && <FestivalPopup type={activeFestival} t={t} onClose={() => setActiveFestival(null)} />}
             <div className={`app-container ${appReady ? 'fade-in-ready' : ''}`}>
                 
@@ -1031,7 +1517,7 @@ function App() {
                     {/* AI 热量功能已从界面移除 */}
                     {view === 'stats' && <StatsView t={t} statsData={statsData} setView={setView} records={records} />}
                     {view === 'anniversary' && <AnniversaryView t={t} anniversaries={anniversaries} setAnniversaries={setAnniversaries} setView={setView} />}
-                    {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />}
+                    {view === 'settings' && <SettingsView t={t} settings={settings} setSettings={setSettings} setView={setView} records={records} setRecords={setRecords} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} user={user} onLogout={handleLogout} />}
                     {view === 'bill' && <BillView t={t} setView={setView} />}
                     {view === 'chef' && <ChefView t={t} setView={setView} />}
                 </main>
@@ -1052,7 +1538,7 @@ function App() {
     );
 }
 
-function SettingsView({ t, settings, setSettings, setView, records, setRecords, deferredPrompt, setDeferredPrompt }: any) {
+function SettingsView({ t, settings, setSettings, setView, records, setRecords, deferredPrompt, setDeferredPrompt, user, onLogout }: any) {
     const update = (obj: Partial<AppSettings>) => setSettings((p: AppSettings) => ({ ...p, ...obj }));
     const updateReminders = (obj: Partial<ReminderSettings>) => setSettings((p: AppSettings) => ({ ...p, reminders: { ...p.reminders, ...obj } }));
     const [guideType, setGuideType] = useState<'ios' | 'quark' | 'default' | null>(null);
@@ -1300,6 +1786,34 @@ function SettingsView({ t, settings, setSettings, setView, records, setRecords, 
                         </div>
                     </div>
                 </div>
+
+                {/* 账户信息 */}
+                {user && (
+                    <div className="settings-card-new">
+                        <div className="section-label">账户</div>
+                        <div className="setting-row">
+                            <div className="setting-left">
+                                <div className="icon-circle">👤</div>
+                                <div>
+                                    <div className="setting-title">当前用户</div>
+                                    <div className="setting-desc">{user.email}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="divider" />
+                        <div className="setting-row">
+                            <div className="setting-left">
+                                <div className="icon-circle" style={{ background: '#FFE5E5' }}>🚪</div>
+                                <div>
+                                    <div className="setting-title" style={{ color: '#FF3B30' }}>{t.auth.logout}</div>
+                                </div>
+                            </div>
+                            <div className="setting-right">
+                                <button className="setting-action-btn danger" onClick={onLogout}>{t.auth.logout}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
             </div>
 
